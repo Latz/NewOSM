@@ -30,25 +30,56 @@ export default function save({ attributes }) {
 }
 
 if (typeof window !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', function() {
-        initializeNewOpmMaps();
-    });
+    function init() {
+        loadLeafletScript(initializeNewOpmMaps);
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
 
     // Also run immediately in case DOM is already loaded
-    if (document.readyState === 'loading') {
-        // DOM not ready yet
-    } else {
-        initializeNewOpmMaps();
+    if (document.readyState !== 'loading') {
+        init();
     }
 }
 
-function initializeNewOpmMaps() {
-    // Check if Leaflet is loaded
-    if (typeof L === 'undefined') {
-        console.error('Leaflet library not loaded');
+function loadLeafletScript(callback) {
+    // Check if Leaflet is already loaded
+    if (typeof L !== 'undefined') {
+        callback();
         return;
     }
 
+    // Check if script is already being loaded
+    if (document.querySelector('script[src*="leaflet"]')) {
+        // Wait for it to load
+        const checkInterval = setInterval(() => {
+            if (typeof L !== 'undefined') {
+                clearInterval(checkInterval);
+                callback();
+            }
+        }, 100);
+        return;
+    }
+
+    // Load Leaflet CSS
+    if (!document.querySelector('link[href*="leaflet.css"]')) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(link);
+    }
+
+    // Load Leaflet JS
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload = callback;
+    script.onerror = () => {
+        console.error('Failed to load Leaflet library');
+    };
+    document.head.appendChild(script);
+}
+
+function initializeNewOpmMaps() {
     const maps = document.querySelectorAll('.newopm-map-frontend');
 
     maps.forEach(function(mapElement) {
@@ -80,6 +111,73 @@ function initializeNewOpmMaps() {
                 marker.bindPopup(markerLabel);
             }
         }
+
+        // Add fullscreen control
+        const fullscreenButton = L.control({ position: 'topright' });
+        fullscreenButton.onAdd = function() {
+            const button = L.DomUtil.create('button', 'leaflet-bar leaflet-control leaflet-control-custom');
+            button.innerHTML = '⛶';
+            button.title = 'Toggle Fullscreen';
+            button.style.backgroundColor = 'white';
+            button.style.width = '30px';
+            button.style.height = '30px';
+            button.style.fontSize = '20px';
+            button.style.cursor = 'pointer';
+            button.style.border = '2px solid rgba(0,0,0,0.2)';
+            button.style.borderRadius = '4px';
+
+            L.DomEvent.disableClickPropagation(button);
+            L.DomEvent.on(button, 'click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const isFullscreen = !!(
+                    document.fullscreenElement ||
+                    document.mozFullScreenElement ||
+                    document.webkitFullscreenElement ||
+                    document.msFullscreenElement
+                );
+
+                if (!isFullscreen) {
+                    // Enter fullscreen
+                    if (mapElement.requestFullscreen) {
+                        mapElement.requestFullscreen();
+                    } else if (mapElement.mozRequestFullScreen) {
+                        mapElement.mozRequestFullScreen();
+                    } else if (mapElement.webkitRequestFullscreen) {
+                        mapElement.webkitRequestFullscreen();
+                    } else if (mapElement.msRequestFullscreen) {
+                        mapElement.msRequestFullscreen();
+                    }
+                } else {
+                    // Exit fullscreen
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.mozCancelFullScreen) {
+                        document.mozCancelFullScreen();
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                    } else if (document.msExitFullscreen) {
+                        document.msExitFullscreen();
+                    }
+                }
+            });
+
+            return button;
+        };
+        fullscreenButton.addTo(map);
+
+        // Handle fullscreen changes
+        const handleFullscreenChange = function() {
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 100);
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('msfullscreenchange', handleFullscreenChange);
 
         mapElement.classList.add('newopm-initialized');
     });

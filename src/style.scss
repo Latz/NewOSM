@@ -40,3 +40,48 @@
         min-height: 300px !important;
     }
 }
+
+// Fullscreen styles
+.newopm-map-frontend:fullscreen {
+    width: 100vw !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+
+    .leaflet-container {
+        width: 100% !important;
+        height: 100% !important;
+    }
+}
+
+.newopm-map-frontend:-webkit-full-screen {
+    width: 100vw !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+
+    .leaflet-container {
+        width: 100% !important;
+        height: 100% !important;
+    }
+}
+
+.newopm-map-frontend:-moz-full-screen {
+    width: 100vw !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+
+    .leaflet-container {
+        width: 100% !important;
+        height: 100% !important;
+    }
+}
+
+.newopm-map-frontend:-ms-fullscreen {
+    width: 100vw !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+
+    .leaflet-container {
+        width: 100% !important;
+        height: 100% !important;
+    }
+}
