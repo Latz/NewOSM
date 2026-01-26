@@ -659,3 +659,11 @@ svg.leaflet-image-layer.leaflet-interactive path {
 		print-color-adjust: exact;
 		}
 	}
+
+/* Fix for scrambled tiles - override any max-width rules */
+.leaflet-container img.leaflet-tile {
+	max-width: none !important;
+	max-height: none !important;
+	width: 256px !important;
+	height: 256px !important;
+}
