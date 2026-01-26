@@ -436,6 +436,34 @@ function ZoomSync({ zoom }) {
 	return null;
 }
 
+// Component to sync map center and zoom when coordinates change
+function MapViewSync({ center, zoom }) {
+	const map = useMap();
+
+	useEffect(() => {
+		if (!map) return;
+
+		// Wait for map to be fully ready before updating view
+		map.whenReady(() => {
+			const currentCenter = map.getCenter();
+			const currentZoom = map.getZoom();
+
+			// Check if center or zoom has changed
+			const centerChanged =
+				Math.abs(currentCenter.lat - center[0]) > 0.0001 ||
+				Math.abs(currentCenter.lng - center[1]) > 0.0001;
+			const zoomChanged = currentZoom !== zoom;
+
+			// Use setView to update both center and zoom efficiently
+			if (centerChanged || zoomChanged) {
+				map.setView(center, zoom, { animate: true });
+			}
+		});
+	}, [map, center, zoom]);
+
+	return null;
+}
+
 // Component to handle map loading state
 function MapLoadingHandler({ onMapReady }) {
 	const map = useMap();
@@ -576,7 +604,6 @@ export default function Edit({ attributes, setAttributes }) {
 	const { latitude, longitude, zoom, markerLat, markerLon, markerLabel, height, width, sizePreset } = attributes;
 	const [searchQuery, setSearchQuery] = useState('');
 	const [isSearching, setIsSearching] = useState(false);
-	const [mapKey, setMapKey] = useState(0);
 	const [useCustomSize, setUseCustomSize] = useState(sizePreset === 'custom');
 	const [isLoadingAddress, setIsLoadingAddress] = useState(false);
 	const [markerAddress, setMarkerAddress] = useState('');
@@ -629,11 +656,7 @@ export default function Edit({ attributes, setAttributes }) {
 
 				if (Object.keys(updates).length > 1) {
 					setAttributes(updates);
-
-					// Force map re-center if location changed
-					if (updates.latitude || updates.longitude) {
-						setMapKey(prev => prev + 1);
-					}
+					// Map will automatically re-center via MapViewSync component
 				}
 			} catch (error) {
 				console.error('Error loading defaults:', error);
@@ -673,7 +696,7 @@ export default function Edit({ attributes, setAttributes }) {
 					markerLon: lon,
 					markerLabel: result.display_name,
 				});
-				setMapKey(prev => prev + 1); // Force map to re-center
+				// Map will automatically re-center via MapViewSync component
 			} else {
 				dispatch('core/notices').createNotice(
 					'warning',
@@ -1025,7 +1048,6 @@ export default function Edit({ attributes, setAttributes }) {
 						aria-label='Interactive map editor for OpenStreetMap'
 					>
 						<MapContainer
-							key={mapKey}
 							center={center}
 							zoom={zoom}
 							style={{ height: '100%', width: '100%' }}
@@ -1042,7 +1064,7 @@ export default function Edit({ attributes, setAttributes }) {
 								url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 							/>
 							<MapLoadingHandler onMapReady={handleMapReady} />
-							<ZoomSync zoom={zoom} />
+							<MapViewSync center={center} zoom={zoom} />
 							<FullscreenControl />
 							<MapInteractionHandler onMapClick={handleMapClick} onZoomChange={handleZoomChange} />
 							{markerPosition && (
