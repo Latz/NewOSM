@@ -475,7 +475,10 @@ function newopm_register_rest_routes() {
     register_rest_route('newopm/v1', '/defaults', array(
         'methods' => 'GET',
         'callback' => 'newopm_rest_get_defaults',
-        'permission_callback' => '__return_true' // Public access for reading defaults
+        'permission_callback' => function() {
+            // Require user to be able to edit posts (same capability needed to use block editor)
+            return current_user_can('edit_posts');
+        }
     ));
 
     // Save defaults endpoint
