@@ -585,19 +585,14 @@ export default function Edit({ attributes, setAttributes }) {
 	useEffect(() => {
 		const loadDefaults = async () => {
 			if (attributes.customDefaultsApplied) {
-				console.log('Defaults already applied, skipping');
 				return;
 			}
 
 			try {
-				console.log('Loading defaults from API...');
 				const defaults = await apiFetch({
 					path: '/newopm/v1/defaults',
 					method: 'GET',
 				});
-
-				console.log('Defaults loaded:', defaults);
-				console.log('Current attributes:', attributes);
 
 				const updates = {
 					customDefaultsApplied: true,
@@ -631,18 +626,13 @@ export default function Edit({ attributes, setAttributes }) {
 					updates.markerLabel = defaults.markerLabel;
 				}
 
-				console.log('Updates to apply:', updates);
-
 				if (Object.keys(updates).length > 1) {
 					setAttributes(updates);
-					console.log('Defaults applied successfully');
 
 					// Force map re-center if location changed
 					if (updates.latitude || updates.longitude) {
 						setMapKey(prev => prev + 1);
 					}
-				} else {
-					console.log('No updates to apply');
 				}
 			} catch (error) {
 				console.error('Error loading defaults:', error);
@@ -792,18 +782,6 @@ export default function Edit({ attributes, setAttributes }) {
 
 	const saveAsDefault = async () => {
 		try {
-			console.log('Saving defaults:', {
-				sizePreset,
-				height,
-				width,
-				zoom,
-				latitude,
-				longitude,
-				markerLat,
-				markerLon,
-				markerLabel,
-			});
-
 			const data = await apiFetch({
 				path: '/newopm/v1/defaults',
 				method: 'POST',
@@ -819,8 +797,6 @@ export default function Edit({ attributes, setAttributes }) {
 					markerLabel: markerLabel,
 				},
 			});
-
-			console.log('Save response:', data);
 
 			if (data.success) {
 				alert(data.message || __('Default settings saved successfully!', 'new-osm'));
