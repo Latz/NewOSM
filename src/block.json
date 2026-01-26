@@ -1,0 +1,58 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "newopm/osm-map",
+  "title": "OpenStreetMap",
+  "category": "media",
+  "icon": "location-alt",
+  "description": "Display an interactive OpenStreetMap with location search and marker placement.",
+  "keywords": ["map", "openstreetmap", "osm", "location", "marker"],
+  "version": "1.0.0",
+  "textdomain": "newopm",
+  "attributes": {
+    "latitude": {
+      "type": "number",
+      "default": 51.505
+    },
+    "longitude": {
+      "type": "number",
+      "default": -0.09
+    },
+    "zoom": {
+      "type": "number",
+      "default": 13
+    },
+    "markerLat": {
+      "type": "number"
+    },
+    "markerLon": {
+      "type": "number"
+    },
+    "markerLabel": {
+      "type": "string",
+      "default": ""
+    },
+    "height": {
+      "type": "number",
+      "default": 400
+    },
+    "width": {
+      "type": "string",
+      "default": "100%"
+    },
+    "sizePreset": {
+      "type": "string",
+      "default": "medium"
+    },
+    "customDefaultsApplied": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "supports": {
+    "align": ["left", "center", "right", "wide", "full"]
+  },
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style-index.css"
+}

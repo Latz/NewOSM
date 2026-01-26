@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose exec:*)",
+      "Bash(git -C /home/latz/docker/wp/wp/wp-content/plugins/NewOSM log:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm outdated:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm install:*)",
+      "Bash(npm audit:*)"
+    ]
+  }
+}

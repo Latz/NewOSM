@@ -1,0 +1,42 @@
+/**
+ * Frontend styles for the NewOSM block
+ */
+
+.wp-block-newopm-osm-map {
+    margin: 1em 0;
+}
+
+.newopm-map-frontend {
+    width: 100%;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+    noscript {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f0f0f0;
+        color: #666;
+        padding: 20px;
+        text-align: center;
+    }
+}
+
+// Leaflet popup customization
+.leaflet-popup-content-wrapper {
+    border-radius: 4px;
+}
+
+.leaflet-popup-content {
+    margin: 12px;
+    line-height: 1.4;
+    font-size: 14px;
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+    .newopm-map-frontend {
+        min-height: 300px !important;
+    }
+}

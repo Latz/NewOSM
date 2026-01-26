@@ -1,0 +1,16 @@
+{
+  "name": "newopm",
+  "version": "1.0.0",
+  "description": "OpenStreetMap Gutenberg block for WordPress",
+  "scripts": {
+    "build": "wp-scripts build",
+    "start": "wp-scripts start"
+  },
+  "devDependencies": {
+    "@wordpress/scripts": "^31.3.0"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "react-leaflet": "^4.2.1"
+  }
+}
