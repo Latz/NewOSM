@@ -94,6 +94,18 @@ function initializeNewOpmMaps() {
 			return;
 		}
 
+		// Show loading indicator
+		const loadingOverlay = document.createElement('div');
+		loadingOverlay.className = 'newopm-loading-overlay';
+		loadingOverlay.innerHTML = `
+			<div class="newopm-loading-content">
+				<div class="newopm-spinner"></div>
+				<p>Loading map...</p>
+			</div>
+		`;
+		mapElement.style.position = 'relative';
+		mapElement.appendChild(loadingOverlay);
+
 		try {
 			// Initialize the map
 			const map = L.map(mapElement, {
@@ -132,6 +144,22 @@ function initializeNewOpmMaps() {
 			if (fullscreenCleanup) {
 				cleanupFunctions.push(fullscreenCleanup);
 			}
+
+			// Remove loading overlay when map is ready
+			map.whenReady(function () {
+				// Small delay to ensure tiles start loading
+				setTimeout(function () {
+					if (loadingOverlay && loadingOverlay.parentNode) {
+						loadingOverlay.style.opacity = '0';
+						loadingOverlay.style.transition = 'opacity 0.3s';
+						setTimeout(function () {
+							if (loadingOverlay.parentNode) {
+								loadingOverlay.parentNode.removeChild(loadingOverlay);
+							}
+						}, 300);
+					}
+				}, 100);
+			});
 
 			// Store map instance and cleanup functions
 			mapInstances.set(mapElement, {

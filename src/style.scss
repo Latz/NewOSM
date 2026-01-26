@@ -11,13 +11,35 @@
     border-radius: 4px;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    position: relative !important;
 
-    // Fix for scrambled tiles - override any max-width rules
+    // Ensure Leaflet container is properly positioned
+    .leaflet-container {
+        position: relative !important;
+        overflow: hidden !important;
+    }
+
+    // Protect all panes from theme CSS interference
+    .leaflet-pane,
+    .leaflet-map-pane,
+    .leaflet-tile-pane {
+        position: absolute !important;
+    }
+
+    // Fix for scrambled tiles - protect dimensions and positioning structure
     img.leaflet-tile {
         max-width: none !important;
         max-height: none !important;
         width: 256px !important;
         height: 256px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        box-sizing: content-box !important;
+        object-fit: fill !important;
+        display: block !important;
+        image-rendering: -webkit-optimize-contrast !important;
+        image-rendering: crisp-edges !important;
     }
 
     noscript {
@@ -92,4 +114,46 @@
         width: 100% !important;
         height: 100% !important;
     }
+}
+
+// Loading overlay styles
+.newopm-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(255, 255, 255, 0.95);
+    z-index: 1000;
+}
+
+.newopm-loading-content {
+    text-align: center;
+
+    p {
+        margin: 0;
+        color: #2271b1;
+        font-size: 14px;
+        font-weight: 500;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    }
+}
+
+// Loading spinner animation
+@keyframes newopm-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.newopm-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #2271b1;
+    border-radius: 50%;
+    margin: 0 auto 12px;
+    animation: newopm-spin 1s linear infinite;
 }

@@ -19,8 +19,6 @@
             img.leaflet-tile {
                 max-width: none !important;
                 max-height: none !important;
-                width: 256px !important;
-                height: 256px !important;
             }
         }
 
@@ -112,4 +110,14 @@
         width: 100% !important;
         height: 100% !important;
     }
+}
+
+// Loading spinner animation
+@keyframes newopm-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.newopm-spinner {
+    animation: newopm-spin 1s linear infinite;
 }

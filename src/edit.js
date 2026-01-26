@@ -434,6 +434,27 @@ function ZoomSync({ zoom }) {
 	return null;
 }
 
+// Component to handle map loading state
+function MapLoadingHandler({ onMapReady }) {
+	const map = useMap();
+
+	useEffect(() => {
+		if (!map) return;
+
+		// Notify parent when map is ready
+		map.whenReady(() => {
+			// Small delay to ensure tiles start loading
+			setTimeout(() => {
+				if (onMapReady) {
+					onMapReady();
+				}
+			}, 100);
+		});
+	}, [map, onMapReady]);
+
+	return null;
+}
+
 // Fullscreen control component
 function FullscreenControl() {
 	const map = useMap();
@@ -544,6 +565,7 @@ export default function Edit({ attributes, setAttributes }) {
 	const [useCustomSize, setUseCustomSize] = useState(sizePreset === 'custom');
 	const [isLoadingAddress, setIsLoadingAddress] = useState(false);
 	const [markerAddress, setMarkerAddress] = useState('');
+	const [isMapLoading, setIsMapLoading] = useState(true);
 
 	// Apply saved defaults on first load
 	useEffect(() => {
@@ -801,6 +823,11 @@ export default function Edit({ attributes, setAttributes }) {
 	const center = [latitude, longitude];
 	const markerPosition = markerLat && markerLon ? [markerLat, markerLon] : null;
 
+	// Callback when map finishes loading
+	const handleMapReady = useCallback(() => {
+		setIsMapLoading(false);
+	}, []);
+
 	return (
 		<>
 			<InspectorControls>
@@ -983,6 +1010,7 @@ export default function Edit({ attributes, setAttributes }) {
 								attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 								url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 							/>
+							<MapLoadingHandler onMapReady={handleMapReady} />
 							<ZoomSync zoom={zoom} />
 							<FullscreenControl />
 							<MapInteractionHandler onMapClick={handleMapClick} onZoomChange={handleZoomChange} />
@@ -990,6 +1018,39 @@ export default function Edit({ attributes, setAttributes }) {
 								<DraggableMarker position={markerPosition} onDragEnd={handleMarkerDrag} label={markerLabel} />
 							)}
 						</MapContainer>
+						{isMapLoading && (
+							<div
+								style={{
+									position: 'absolute',
+									top: 0,
+									left: 0,
+									right: 0,
+									bottom: 0,
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									backgroundColor: 'rgba(255, 255, 255, 0.9)',
+									zIndex: 1000,
+								}}
+							>
+								<div style={{ textAlign: 'center' }}>
+									<div
+										className='newopm-spinner'
+										style={{
+											width: '40px',
+											height: '40px',
+											border: '4px solid #f3f3f3',
+											borderTop: '4px solid #2271b1',
+											borderRadius: '50%',
+											margin: '0 auto 12px',
+										}}
+									/>
+									<p style={{ margin: 0, color: '#2271b1', fontSize: '14px', fontWeight: '500' }}>
+										Loading map...
+									</p>
+								</div>
+							</div>
+						)}
 					</div>
 				</MapErrorBoundary>
 			</div>
