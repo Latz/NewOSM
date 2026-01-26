@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from '@wordpress/element';
+import { useState, useEffect, useRef, useCallback } from '@wordpress/element';
 import { InspectorControls, useBlockProps } from '@wordpress/block-editor';
 import { PanelBody, TextControl, RangeControl, Button, SelectControl, ToggleControl } from '@wordpress/components';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
@@ -22,6 +22,137 @@ L.Icon.Default.mergeOptions({
 	iconUrl: pluginUrl + '/assets/leaflet/marker-icon.png',
 	shadowUrl: pluginUrl + '/assets/leaflet/marker-shadow.png',
 });
+
+/**
+ * Rate limiter for Nominatim API requests
+ * Ensures compliance with Nominatim usage policy (max 1 request/second)
+ */
+class NominatimRateLimiter {
+	constructor() {
+		this.lastRequestTime = 0;
+		this.minInterval = 1000; // 1 second minimum between requests
+		this.cache = new Map();
+		this.cacheExpiry = 5 * 60 * 1000; // 5 minutes cache
+		this.pendingRequest = null;
+	}
+
+	/**
+	 * Get cache key for a request
+	 */
+	getCacheKey(url) {
+		return url;
+	}
+
+	/**
+	 * Check if cached data is still valid
+	 */
+	getCached(key) {
+		const cached = this.cache.get(key);
+		if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
+			return cached.data;
+		}
+		this.cache.delete(key);
+		return null;
+	}
+
+	/**
+	 * Store data in cache
+	 */
+	setCache(key, data) {
+		this.cache.set(key, {
+			data,
+			timestamp: Date.now(),
+		});
+	}
+
+	/**
+	 * Make a rate-limited request to Nominatim
+	 */
+	async request(url) {
+		const cacheKey = this.getCacheKey(url);
+
+		// Check cache first
+		const cached = this.getCached(cacheKey);
+		if (cached) {
+			return cached;
+		}
+
+		// If there's a pending request for the same URL, wait for it
+		if (this.pendingRequest && this.pendingRequest.url === url) {
+			return this.pendingRequest.promise;
+		}
+
+		// Calculate time to wait to respect rate limit
+		const now = Date.now();
+		const timeSinceLastRequest = now - this.lastRequestTime;
+		const timeToWait = Math.max(0, this.minInterval - timeSinceLastRequest);
+
+		// Wait if necessary
+		if (timeToWait > 0) {
+			await new Promise(resolve => setTimeout(resolve, timeToWait));
+		}
+
+		// Create the request promise
+		const promise = (async () => {
+			try {
+				this.lastRequestTime = Date.now();
+
+				const response = await fetch(url, {
+					headers: {
+						'User-Agent': 'WordPress-NewOSM-Plugin/1.0',
+					},
+				});
+
+				// Handle rate limiting
+				if (response.status === 429) {
+					const retryAfter = response.headers.get('Retry-After');
+					const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 2000;
+					throw new Error(`Rate limited. Please wait ${Math.ceil(waitTime / 1000)} seconds before trying again.`);
+				}
+
+				if (!response.ok) {
+					throw new Error(`HTTP error! status: ${response.status}`);
+				}
+
+				const data = await response.json();
+
+				// Cache the result
+				this.setCache(cacheKey, data);
+
+				return data;
+			} finally {
+				// Clear pending request
+				if (this.pendingRequest && this.pendingRequest.url === url) {
+					this.pendingRequest = null;
+				}
+			}
+		})();
+
+		// Store as pending request
+		this.pendingRequest = { url, promise };
+
+		return promise;
+	}
+
+	/**
+	 * Search for a location
+	 */
+	async search(query) {
+		const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+		return this.request(url);
+	}
+
+	/**
+	 * Reverse geocode coordinates
+	 */
+	async reverse(lat, lon) {
+		const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+		return this.request(url);
+	}
+}
+
+// Create a singleton instance
+const nominatimAPI = new NominatimRateLimiter();
 
 // Custom pan handler that doesn't get stuck
 function MapInteractionHandler({ onMapClick, onZoomChange }) {
@@ -382,16 +513,7 @@ export default function Edit({ attributes, setAttributes }) {
 
 		setIsSearching(true);
 		try {
-			const response = await fetch(
-				`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`,
-				{
-					headers: {
-						'User-Agent': 'WordPress-NewOSM-Plugin/1.0',
-					},
-				}
-			);
-
-			const data = await response.json();
+			const data = await nominatimAPI.search(searchQuery);
 
 			if (data && data.length > 0) {
 				const result = data[0];
@@ -415,54 +537,72 @@ export default function Edit({ attributes, setAttributes }) {
 			}
 		} catch (error) {
 			console.error('Search error:', error);
-			alert('Error searching for location. Please try again.');
+			// Provide more specific error message
+			const errorMessage = error.message.includes('Rate limited')
+				? error.message
+				: 'Error searching for location. Please try again in a moment.';
+			alert(errorMessage);
 		} finally {
 			setIsSearching(false);
 		}
 	};
 
-	const fetchAddress = async (lat, lon) => {
-		// Set marker immediately with coordinates
-		const coordLabel = `Lat: ${lat.toFixed(5)}, Lon: ${lon.toFixed(5)}`;
-		setAttributes({
-			markerLat: lat,
-			markerLon: lon,
-			markerLabel: coordLabel,
-		});
+	// Debounced reverse geocoding to prevent rapid API calls during marker dragging
+	const reverseGeocodeTimeout = useRef(null);
 
-		// Fetch address in background
-		setIsLoadingAddress(true);
-		setMarkerAddress('');
+	const fetchAddress = useCallback(
+		async (lat, lon) => {
+			// Set marker immediately with coordinates
+			const coordLabel = `Lat: ${lat.toFixed(5)}, Lon: ${lon.toFixed(5)}`;
+			setAttributes({
+				markerLat: lat,
+				markerLon: lon,
+				markerLabel: coordLabel,
+			});
 
-		try {
-			const response = await fetch(
-				`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
-				{
-					headers: {
-						'User-Agent': 'WordPress-NewOSM-Plugin/1.0',
-					},
-				}
-			);
-
-			const data = await response.json();
-
-			if (data && data.display_name) {
-				setMarkerAddress(data.display_name);
-				setAttributes({
-					markerLat: lat,
-					markerLon: lon,
-					markerLabel: data.display_name,
-				});
-			} else {
-				setMarkerAddress('');
+			// Clear any pending reverse geocode request
+			if (reverseGeocodeTimeout.current) {
+				clearTimeout(reverseGeocodeTimeout.current);
 			}
-		} catch (error) {
-			console.error('Reverse geocoding error:', error);
-			setMarkerAddress('');
-		} finally {
-			setIsLoadingAddress(false);
-		}
-	};
+
+			// Debounce the reverse geocoding by 500ms
+			reverseGeocodeTimeout.current = setTimeout(async () => {
+				setIsLoadingAddress(true);
+				setMarkerAddress('');
+
+				try {
+					const data = await nominatimAPI.reverse(lat, lon);
+
+					if (data && data.display_name) {
+						setMarkerAddress(data.display_name);
+						setAttributes({
+							markerLat: lat,
+							markerLon: lon,
+							markerLabel: data.display_name,
+						});
+					} else {
+						setMarkerAddress('');
+					}
+				} catch (error) {
+					console.error('Reverse geocoding error:', error);
+					setMarkerAddress('');
+					// Don't show alert for reverse geocoding errors to avoid interrupting user workflow
+				} finally {
+					setIsLoadingAddress(false);
+				}
+			}, 500); // Wait 500ms after user stops dragging before making request
+		},
+		[setAttributes]
+	);
+
+	// Cleanup debounce timeout on unmount
+	useEffect(() => {
+		return () => {
+			if (reverseGeocodeTimeout.current) {
+				clearTimeout(reverseGeocodeTimeout.current);
+			}
+		};
+	}, []);
 
 	const handleMapClick = latlng => {
 		fetchAddress(latlng.lat, latlng.lng);
