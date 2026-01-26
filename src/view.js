@@ -97,13 +97,18 @@ function initializeNewOpmMaps() {
 		// Show loading indicator
 		const loadingOverlay = document.createElement('div');
 		loadingOverlay.className = 'newopm-loading-overlay';
+		loadingOverlay.setAttribute('role', 'status');
+		loadingOverlay.setAttribute('aria-live', 'polite');
+		loadingOverlay.setAttribute('aria-label', 'Map is loading');
 		loadingOverlay.innerHTML = `
 			<div class="newopm-loading-content">
-				<div class="newopm-spinner"></div>
+				<div class="newopm-spinner" role="img" aria-label="Loading spinner"></div>
 				<p>Loading map...</p>
 			</div>
 		`;
 		mapElement.style.position = 'relative';
+		mapElement.setAttribute('role', 'region');
+		mapElement.setAttribute('aria-label', 'Interactive OpenStreetMap');
 		mapElement.appendChild(loadingOverlay);
 
 		try {
@@ -195,6 +200,12 @@ function addFullscreenControl(map, mapElement) {
 		button.style.border = '2px solid rgba(0,0,0,0.2)';
 		button.style.borderRadius = '4px';
 
+		// Accessibility attributes
+		button.setAttribute('aria-label', 'Toggle fullscreen map view');
+		button.setAttribute('role', 'button');
+		button.setAttribute('type', 'button');
+		button.setAttribute('aria-pressed', 'false');
+
 		L.DomEvent.disableClickPropagation(button);
 		L.DomEvent.on(button, 'click', function (e) {
 			e.preventDefault();
@@ -209,6 +220,20 @@ function addFullscreenControl(map, mapElement) {
 
 	// Handle fullscreen changes
 	const handleFullscreenChange = function () {
+		const isFullscreen = !!(
+			document.fullscreenElement ||
+			document.mozFullScreenElement ||
+			document.webkitFullscreenElement ||
+			document.msFullscreenElement
+		);
+
+		// Update ARIA attributes
+		const fullscreenBtn = mapElement.querySelector('.leaflet-control-custom');
+		if (fullscreenBtn) {
+			fullscreenBtn.setAttribute('aria-pressed', isFullscreen ? 'true' : 'false');
+			fullscreenBtn.setAttribute('aria-label', isFullscreen ? 'Exit fullscreen map view' : 'Toggle fullscreen map view');
+		}
+
 		setTimeout(() => {
 			if (map) {
 				map.invalidateSize();

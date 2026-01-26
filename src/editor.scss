@@ -104,3 +104,27 @@
 .newopm-spinner {
     animation: newopm-spin 1s linear infinite;
 }
+
+// Screen reader only text (visually hidden but accessible)
+.sr-only,
+.screen-reader-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+
+    &:focus {
+        position: static;
+        width: auto;
+        height: auto;
+        margin: 0;
+        overflow: visible;
+        clip: auto;
+        white-space: normal;
+    }
+}

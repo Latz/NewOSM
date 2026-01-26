@@ -478,6 +478,12 @@ function FullscreenControl() {
 			button.style.border = '2px solid rgba(0,0,0,0.2)';
 			button.style.borderRadius = '4px';
 
+			// Accessibility attributes
+			button.setAttribute('aria-label', 'Toggle fullscreen map view');
+			button.setAttribute('role', 'button');
+			button.setAttribute('type', 'button');
+			button.setAttribute('aria-pressed', 'false');
+
 			L.DomEvent.disableClickPropagation(button);
 			L.DomEvent.on(button, 'click', function (e) {
 				e.preventDefault();
@@ -525,6 +531,13 @@ function FullscreenControl() {
 				document.msFullscreenElement
 			);
 			setIsFullscreen(isNowFullscreen);
+
+			// Update ARIA attribute
+			const fullscreenBtn = container.querySelector('.leaflet-control-custom');
+			if (fullscreenBtn) {
+				fullscreenBtn.setAttribute('aria-pressed', isNowFullscreen ? 'true' : 'false');
+				fullscreenBtn.setAttribute('aria-label', isNowFullscreen ? 'Exit fullscreen map view' : 'Toggle fullscreen map view');
+			}
 
 			// Invalidate map size when entering/exiting fullscreen
 			setTimeout(() => {
@@ -992,7 +1005,12 @@ export default function Edit({ attributes, setAttributes }) {
 
 			<div {...blockProps}>
 				<MapErrorBoundary>
-					<div className='newopm-map-container' style={{ height: height + 'px' }}>
+					<div
+						className='newopm-map-container'
+						style={{ height: height + 'px' }}
+						role='application'
+						aria-label='Interactive map editor for OpenStreetMap'
+					>
 						<MapContainer
 							key={mapKey}
 							center={center}
@@ -1032,6 +1050,9 @@ export default function Edit({ attributes, setAttributes }) {
 									backgroundColor: 'rgba(255, 255, 255, 0.9)',
 									zIndex: 1000,
 								}}
+								role='status'
+								aria-live='polite'
+								aria-label='Map is loading'
 							>
 								<div style={{ textAlign: 'center' }}>
 									<div
@@ -1044,6 +1065,8 @@ export default function Edit({ attributes, setAttributes }) {
 											borderRadius: '50%',
 											margin: '0 auto 12px',
 										}}
+										role='img'
+										aria-label='Loading spinner'
 									/>
 									<p style={{ margin: 0, color: '#2271b1', fontSize: '14px', fontWeight: '500' }}>
 										Loading map...
