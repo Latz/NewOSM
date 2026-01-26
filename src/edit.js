@@ -8,10 +8,11 @@ import 'leaflet/dist/leaflet.css';
 
 // Fix for default marker icons in Leaflet with Webpack
 delete L.Icon.Default.prototype._getIconUrl;
+const pluginUrl = window.location.origin + '/wp-content/plugins/NewOSM';
 L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconRetinaUrl: pluginUrl + '/assets/leaflet/marker-icon-2x.png',
+    iconUrl: pluginUrl + '/assets/leaflet/marker-icon.png',
+    shadowUrl: pluginUrl + '/assets/leaflet/marker-shadow.png',
 });
 
 // Custom pan handler that doesn't get stuck

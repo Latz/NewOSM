@@ -24,32 +24,16 @@ function newopm_register_block() {
 add_action('init', 'newopm_register_block');
 
 /**
- * Enqueue Leaflet CSS for frontend
+ * Add plugin URL to frontend
  */
-function newopm_enqueue_leaflet_assets() {
+function newopm_add_plugin_url() {
     if (has_block('newopm/osm-map')) {
-        wp_enqueue_style(
-            'leaflet-css',
-            'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-            array(),
-            '1.9.4'
-        );
+        $plugin_url = plugin_dir_url(__FILE__);
+        echo "<script>window.newOpmPluginUrl = '" . esc_js($plugin_url) . "';</script>\n";
     }
 }
-add_action('wp_enqueue_scripts', 'newopm_enqueue_leaflet_assets');
+add_action('wp_head', 'newopm_add_plugin_url', 1);
 
-/**
- * Enqueue Leaflet CSS for block editor
- */
-function newopm_enqueue_editor_assets() {
-    wp_enqueue_style(
-        'leaflet-css',
-        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-        array(),
-        '1.9.4'
-    );
-}
-add_action('enqueue_block_editor_assets', 'newopm_enqueue_editor_assets');
 
 /**
  * Add settings page

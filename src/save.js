@@ -61,17 +61,20 @@ function loadLeafletScript(callback) {
         return;
     }
 
+    // Get plugin URL from a known element or construct it
+    const pluginUrl = window.newOpmPluginUrl || '/wp-content/plugins/NewOSM';
+
     // Load Leaflet CSS
     if (!document.querySelector('link[href*="leaflet.css"]')) {
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        link.href = pluginUrl + '/assets/leaflet/leaflet.css';
         document.head.appendChild(link);
     }
 
     // Load Leaflet JS
     const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.src = pluginUrl + '/assets/leaflet/leaflet.js';
     script.onload = callback;
     script.onerror = () => {
         console.error('Failed to load Leaflet library');
