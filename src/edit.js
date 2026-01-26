@@ -4,6 +4,7 @@ import { PanelBody, TextControl, RangeControl, Button, SelectControl, ToggleCont
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import apiFetch from '@wordpress/api-fetch';
 import { __ } from '@wordpress/i18n';
+import { dispatch } from '@wordpress/data';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -674,7 +675,14 @@ export default function Edit({ attributes, setAttributes }) {
 				});
 				setMapKey(prev => prev + 1); // Force map to re-center
 			} else {
-				alert(__('Location not found. Please try a different search term.', 'new-osm'));
+				dispatch('core/notices').createNotice(
+					'warning',
+					__('Location not found. Please try a different search term.', 'new-osm'),
+					{
+						type: 'snackbar',
+						isDismissible: true,
+					}
+				);
 			}
 		} catch (error) {
 			console.error('Search error:', error);
@@ -682,7 +690,14 @@ export default function Edit({ attributes, setAttributes }) {
 			const errorMessage = error.message.includes('Rate limited')
 				? error.message
 				: __('Error searching for location. Please try again in a moment.', 'new-osm');
-			alert(errorMessage);
+			dispatch('core/notices').createNotice(
+				'error',
+				errorMessage,
+				{
+					type: 'snackbar',
+					isDismissible: true,
+				}
+			);
 		} finally {
 			setIsSearching(false);
 		}
@@ -799,14 +814,35 @@ export default function Edit({ attributes, setAttributes }) {
 			});
 
 			if (data.success) {
-				alert(data.message || __('Default settings saved successfully!', 'new-osm'));
+				dispatch('core/notices').createNotice(
+					'success',
+					data.message || __('Default settings saved successfully!', 'new-osm'),
+					{
+						type: 'snackbar',
+						isDismissible: true,
+					}
+				);
 			} else {
-				alert(__('Settings may not have been saved. Check console for details.', 'new-osm'));
+				dispatch('core/notices').createNotice(
+					'warning',
+					__('Settings may not have been saved. Check console for details.', 'new-osm'),
+					{
+						type: 'snackbar',
+						isDismissible: true,
+					}
+				);
 			}
 		} catch (error) {
 			console.error('Error saving defaults:', error);
 			console.error('Error details:', error.message, error.data);
-			alert(__('Error saving defaults: ', 'new-osm') + (error.message || __('Unknown error', 'new-osm')));
+			dispatch('core/notices').createNotice(
+				'error',
+				__('Error saving defaults: ', 'new-osm') + (error.message || __('Unknown error', 'new-osm')),
+				{
+					type: 'snackbar',
+					isDismissible: true,
+				}
+			);
 		}
 	};
 
