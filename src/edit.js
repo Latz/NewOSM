@@ -3,6 +3,7 @@ import { InspectorControls, useBlockProps } from '@wordpress/block-editor';
 import { PanelBody, TextControl, RangeControl, Button, SelectControl, ToggleControl } from '@wordpress/components';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import apiFetch from '@wordpress/api-fetch';
+import { __ } from '@wordpress/i18n';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -55,20 +56,20 @@ class MapErrorBoundary extends Component {
 						color: '#444',
 					}}
 				>
-					<h3 style={{ margin: '0 0 12px 0', color: '#dc3232' }}>Map Failed to Load</h3>
+					<h3 style={{ margin: '0 0 12px 0', color: '#dc3232' }}>{__('Map Failed to Load', 'new-osm')}</h3>
 					<p style={{ margin: '0 0 12px 0' }}>
-						The map component encountered an error and could not be displayed. This may be due to:
+						{__('The map component encountered an error and could not be displayed. This may be due to:', 'new-osm')}
 					</p>
 					<ul style={{ margin: '0 0 16px 20px' }}>
-						<li>Network connectivity issues</li>
-						<li>Leaflet library failed to load</li>
-						<li>Invalid map configuration</li>
-						<li>Browser compatibility issues</li>
+						<li>{__('Network connectivity issues', 'new-osm')}</li>
+						<li>{__('Leaflet library failed to load', 'new-osm')}</li>
+						<li>{__('Invalid map configuration', 'new-osm')}</li>
+						<li>{__('Browser compatibility issues', 'new-osm')}</li>
 					</ul>
 					{this.state.error && (
 						<details style={{ marginBottom: '16px' }}>
 							<summary style={{ cursor: 'pointer', fontWeight: 'bold', marginBottom: '8px' }}>
-								Error Details (for debugging)
+								{__('Error Details (for debugging)', 'new-osm')}
 							</summary>
 							<pre
 								style={{
@@ -97,7 +98,7 @@ class MapErrorBoundary extends Component {
 								cursor: 'pointer',
 							}}
 						>
-							Try Again
+							{__('Try Again', 'new-osm')}
 						</button>
 						<button
 							onClick={() => window.location.reload()}
@@ -110,7 +111,7 @@ class MapErrorBoundary extends Component {
 								cursor: 'pointer',
 							}}
 						>
-							Reload Page
+							{__('Reload Page', 'new-osm')}
 						</button>
 					</div>
 				</div>
@@ -683,14 +684,14 @@ export default function Edit({ attributes, setAttributes }) {
 				});
 				setMapKey(prev => prev + 1); // Force map to re-center
 			} else {
-				alert('Location not found. Please try a different search term.');
+				alert(__('Location not found. Please try a different search term.', 'new-osm'));
 			}
 		} catch (error) {
 			console.error('Search error:', error);
 			// Provide more specific error message
 			const errorMessage = error.message.includes('Rate limited')
 				? error.message
-				: 'Error searching for location. Please try again in a moment.';
+				: __('Error searching for location. Please try again in a moment.', 'new-osm');
 			alert(errorMessage);
 		} finally {
 			setIsSearching(false);
@@ -822,14 +823,14 @@ export default function Edit({ attributes, setAttributes }) {
 			console.log('Save response:', data);
 
 			if (data.success) {
-				alert(data.message || 'Default settings saved successfully!');
+				alert(data.message || __('Default settings saved successfully!', 'new-osm'));
 			} else {
-				alert('Settings may not have been saved. Check console for details.');
+				alert(__('Settings may not have been saved. Check console for details.', 'new-osm'));
 			}
 		} catch (error) {
 			console.error('Error saving defaults:', error);
 			console.error('Error details:', error.message, error.data);
-			alert('Error saving defaults: ' + (error.message || 'Unknown error'));
+			alert(__('Error saving defaults: ', 'new-osm') + (error.message || __('Unknown error', 'new-osm')));
 		}
 	};
 
@@ -1069,7 +1070,7 @@ export default function Edit({ attributes, setAttributes }) {
 										aria-label='Loading spinner'
 									/>
 									<p style={{ margin: 0, color: '#2271b1', fontSize: '14px', fontWeight: '500' }}>
-										Loading map...
+										{__('Loading map...', 'new-osm')}
 									</p>
 								</div>
 							</div>

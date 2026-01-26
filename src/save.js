@@ -1,4 +1,5 @@
 import { useBlockProps } from '@wordpress/block-editor';
+import { __ } from '@wordpress/i18n';
 
 export default function save({ attributes }) {
 	const { latitude, longitude, zoom, markerLat, markerLon, markerLabel, height, width } = attributes;
@@ -14,7 +15,7 @@ export default function save({ attributes }) {
 			<div {...blockProps}>
 				<div className='newopm-map-error' style={{ padding: '20px', border: '2px solid #dc3232', borderRadius: '4px', backgroundColor: '#fef7f7' }}>
 					<p style={{ margin: 0, color: '#dc3232' }}>
-						<strong>Invalid map configuration:</strong> Please check the map coordinates and zoom level in the block settings.
+						<strong>{__('Invalid map configuration:', 'new-osm')}</strong> {__('Please check the map coordinates and zoom level in the block settings.', 'new-osm')}
 					</p>
 				</div>
 			</div>
@@ -39,7 +40,7 @@ export default function save({ attributes }) {
 				style={{ height: height + 'px', width: width || '100%' }}
 			>
 				<noscript>
-					<p>This map requires JavaScript to display.</p>
+					<p>{__('This map requires JavaScript to display.', 'new-osm')}</p>
 				</noscript>
 			</div>
 		</div>
