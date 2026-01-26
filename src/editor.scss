@@ -63,8 +63,8 @@
     color: #333;
 }
 
-// Fullscreen styles
-.newopm-map-container:fullscreen {
+// Fullscreen styles mixin
+@mixin fullscreen-map {
     width: 100vw !important;
     height: 100vh !important;
     border: none !important;
@@ -76,39 +76,22 @@
     }
 }
 
-.newopm-map-container:-webkit-full-screen {
-    width: 100vw !important;
-    height: 100vh !important;
-    border: none !important;
-    border-radius: 0 !important;
-
-    .leaflet-container {
-        width: 100% !important;
-        height: 100% !important;
+// Apply fullscreen styles with vendor prefixes
+.newopm-map-container {
+    &:fullscreen {
+        @include fullscreen-map;
     }
-}
 
-.newopm-map-container:-moz-full-screen {
-    width: 100vw !important;
-    height: 100vh !important;
-    border: none !important;
-    border-radius: 0 !important;
-
-    .leaflet-container {
-        width: 100% !important;
-        height: 100% !important;
+    &:-webkit-full-screen {
+        @include fullscreen-map;
     }
-}
 
-.newopm-map-container:-ms-fullscreen {
-    width: 100vw !important;
-    height: 100vh !important;
-    border: none !important;
-    border-radius: 0 !important;
+    &:-moz-full-screen {
+        @include fullscreen-map;
+    }
 
-    .leaflet-container {
-        width: 100% !important;
-        height: 100% !important;
+    &:-ms-fullscreen {
+        @include fullscreen-map;
     }
 }
 
