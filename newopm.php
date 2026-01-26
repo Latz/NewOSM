@@ -258,7 +258,7 @@ function newopm_render_settings_page() {
         return;
     }
 
-    // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- WordPress handles nonce for settings page
+    // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Reading settings-updated flag set by WordPress Settings API after successful nonce verification
     if (isset($_GET['settings-updated']) && $_GET['settings-updated']) {
         add_settings_error(
             'newopm_messages',
