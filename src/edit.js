@@ -1,10 +1,125 @@
-import { useState, useEffect, useRef, useCallback } from '@wordpress/element';
+import { useState, useEffect, useRef, useCallback, Component } from '@wordpress/element';
 import { InspectorControls, useBlockProps } from '@wordpress/block-editor';
 import { PanelBody, TextControl, RangeControl, Button, SelectControl, ToggleControl } from '@wordpress/components';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import apiFetch from '@wordpress/api-fetch';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+
+/**
+ * Error Boundary Component
+ * Catches errors in map components to prevent entire editor from crashing
+ */
+class MapErrorBoundary extends Component {
+	constructor(props) {
+		super(props);
+		this.state = {
+			hasError: false,
+			error: null,
+			errorInfo: null,
+		};
+	}
+
+	static getDerivedStateFromError(error) {
+		// Update state so the next render will show the fallback UI
+		return { hasError: true };
+	}
+
+	componentDidCatch(error, errorInfo) {
+		// Log error details for debugging
+		console.error('Map component error:', error, errorInfo);
+		this.setState({
+			error,
+			errorInfo,
+		});
+	}
+
+	handleReset = () => {
+		// Reset error state and attempt to re-render
+		this.setState({
+			hasError: false,
+			error: null,
+			errorInfo: null,
+		});
+	};
+
+	render() {
+		if (this.state.hasError) {
+			return (
+				<div
+					style={{
+						padding: '20px',
+						border: '2px solid #dc3232',
+						borderRadius: '4px',
+						backgroundColor: '#fef7f7',
+						color: '#444',
+					}}
+				>
+					<h3 style={{ margin: '0 0 12px 0', color: '#dc3232' }}>Map Failed to Load</h3>
+					<p style={{ margin: '0 0 12px 0' }}>
+						The map component encountered an error and could not be displayed. This may be due to:
+					</p>
+					<ul style={{ margin: '0 0 16px 20px' }}>
+						<li>Network connectivity issues</li>
+						<li>Leaflet library failed to load</li>
+						<li>Invalid map configuration</li>
+						<li>Browser compatibility issues</li>
+					</ul>
+					{this.state.error && (
+						<details style={{ marginBottom: '16px' }}>
+							<summary style={{ cursor: 'pointer', fontWeight: 'bold', marginBottom: '8px' }}>
+								Error Details (for debugging)
+							</summary>
+							<pre
+								style={{
+									backgroundColor: '#f5f5f5',
+									padding: '10px',
+									borderRadius: '4px',
+									fontSize: '12px',
+									overflow: 'auto',
+									maxHeight: '200px',
+								}}
+							>
+								{this.state.error.toString()}
+								{this.state.errorInfo && this.state.errorInfo.componentStack}
+							</pre>
+						</details>
+					)}
+					<div style={{ display: 'flex', gap: '8px' }}>
+						<button
+							onClick={this.handleReset}
+							style={{
+								padding: '8px 16px',
+								backgroundColor: '#2271b1',
+								color: 'white',
+								border: 'none',
+								borderRadius: '3px',
+								cursor: 'pointer',
+							}}
+						>
+							Try Again
+						</button>
+						<button
+							onClick={() => window.location.reload()}
+							style={{
+								padding: '8px 16px',
+								backgroundColor: '#dcdcdc',
+								color: '#2c3338',
+								border: 'none',
+								borderRadius: '3px',
+								cursor: 'pointer',
+							}}
+						>
+							Reload Page
+						</button>
+					</div>
+				</div>
+			);
+		}
+
+		return this.props.children;
+	}
+}
 
 // Fix for default marker icons in Leaflet with Webpack
 delete L.Icon.Default.prototype._getIconUrl;
@@ -849,32 +964,34 @@ export default function Edit({ attributes, setAttributes }) {
 			</InspectorControls>
 
 			<div {...blockProps}>
-				<div className='newopm-map-container' style={{ height: height + 'px' }}>
-					<MapContainer
-						key={mapKey}
-						center={center}
-						zoom={zoom}
-						style={{ height: '100%', width: '100%' }}
-						scrollWheelZoom={true}
-						dragging={true}
-						touchZoom={true}
-						doubleClickZoom={true}
-						boxZoom={true}
-						keyboard={true}
-						trackResize={true}
-					>
-						<TileLayer
-							attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-							url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-						/>
-						<ZoomSync zoom={zoom} />
-						<FullscreenControl />
-						<MapInteractionHandler onMapClick={handleMapClick} onZoomChange={handleZoomChange} />
-						{markerPosition && (
-							<DraggableMarker position={markerPosition} onDragEnd={handleMarkerDrag} label={markerLabel} />
-						)}
-					</MapContainer>
-				</div>
+				<MapErrorBoundary>
+					<div className='newopm-map-container' style={{ height: height + 'px' }}>
+						<MapContainer
+							key={mapKey}
+							center={center}
+							zoom={zoom}
+							style={{ height: '100%', width: '100%' }}
+							scrollWheelZoom={true}
+							dragging={true}
+							touchZoom={true}
+							doubleClickZoom={true}
+							boxZoom={true}
+							keyboard={true}
+							trackResize={true}
+						>
+							<TileLayer
+								attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+								url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+							/>
+							<ZoomSync zoom={zoom} />
+							<FullscreenControl />
+							<MapInteractionHandler onMapClick={handleMapClick} onZoomChange={handleZoomChange} />
+							{markerPosition && (
+								<DraggableMarker position={markerPosition} onDragEnd={handleMarkerDrag} label={markerLabel} />
+							)}
+						</MapContainer>
+					</div>
+				</MapErrorBoundary>
 			</div>
 		</>
 	);
