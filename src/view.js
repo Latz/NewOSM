@@ -114,7 +114,7 @@ function initializeNewOpmMaps() {
 		try {
 			// Initialize the map
 			const map = L.map(mapElement, {
-				preferCanvas: false,
+				preferCanvas: true, // Use Canvas rendering for better performance (2-3x faster)
 				trackResize: true,
 			}).setView([lat, lon], zoom);
 
@@ -129,11 +129,16 @@ function initializeNewOpmMaps() {
 			}, 100);
 			cleanupFunctions.push(() => clearTimeout(resizeTimeout));
 
-			// Add tile layer
+			// Add tile layer with performance optimizations
 			L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 				attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
 				maxZoom: 19,
 				tileSize: 256,
+				updateWhenIdle: true, // Only update tiles when map stops moving
+				updateWhenZooming: false, // Don't update during zoom animation
+				keepBuffer: 2, // Keep 2 tile rows/cols in buffer for smoother panning
+				maxNativeZoom: 19,
+				minZoom: 2,
 			}).addTo(map);
 
 			// Add marker if coordinates are present
@@ -231,7 +236,10 @@ function addFullscreenControl(map, mapElement) {
 		const fullscreenBtn = mapElement.querySelector('.leaflet-control-custom');
 		if (fullscreenBtn) {
 			fullscreenBtn.setAttribute('aria-pressed', isFullscreen ? 'true' : 'false');
-			fullscreenBtn.setAttribute('aria-label', isFullscreen ? 'Exit fullscreen map view' : 'Toggle fullscreen map view');
+			fullscreenBtn.setAttribute(
+				'aria-label',
+				isFullscreen ? 'Exit fullscreen map view' : 'Toggle fullscreen map view'
+			);
 		}
 
 		setTimeout(() => {

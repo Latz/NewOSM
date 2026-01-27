@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, Component } from '@wordpress/element';
+import { useState, useEffect, useRef, useCallback, Component, memo, useMemo } from '@wordpress/element';
 import { InspectorControls, useBlockProps } from '@wordpress/block-editor';
 import { PanelBody, TextControl, RangeControl, Button, SelectControl, ToggleControl } from '@wordpress/components';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
@@ -272,7 +272,7 @@ class NominatimRateLimiter {
 const nominatimAPI = new NominatimRateLimiter();
 
 // Custom pan handler that doesn't get stuck
-function MapInteractionHandler({ onMapClick, onZoomChange }) {
+const MapInteractionHandler = memo(function MapInteractionHandler({ onMapClick, onZoomChange }) {
 	const map = useMap();
 	const isDragging = useRef(false);
 	const dragStart = useRef(null);
@@ -396,30 +396,33 @@ function MapInteractionHandler({ onMapClick, onZoomChange }) {
 	}, [map, onMapClick, onZoomChange]);
 
 	return null;
-}
+});
 
-function DraggableMarker({ position, onDragEnd, label }) {
+const DraggableMarker = memo(function DraggableMarker({ position, onDragEnd, label }) {
 	const [markerRef, setMarkerRef] = useState(null);
 
-	const eventHandlers = {
-		dragend() {
-			const marker = markerRef;
-			if (marker != null) {
-				const newPos = marker.getLatLng();
-				onDragEnd(newPos);
-			}
-		},
-	};
+	const eventHandlers = useMemo(
+		() => ({
+			dragend() {
+				const marker = markerRef;
+				if (marker != null) {
+					const newPos = marker.getLatLng();
+					onDragEnd(newPos);
+				}
+			},
+		}),
+		[markerRef, onDragEnd]
+	);
 
 	return (
 		<Marker draggable={true} eventHandlers={eventHandlers} position={position} ref={setMarkerRef}>
 			<Popup>{label || `Lat: ${position.lat.toFixed(5)}, Lon: ${position.lng.toFixed(5)}`}</Popup>
 		</Marker>
 	);
-}
+});
 
 // Component to sync zoom from sidebar to map
-function ZoomSync({ zoom }) {
+const ZoomSync = memo(function ZoomSync({ zoom }) {
 	const map = useMap();
 
 	useEffect(() => {
@@ -434,10 +437,10 @@ function ZoomSync({ zoom }) {
 	}, [map, zoom]);
 
 	return null;
-}
+});
 
 // Component to sync map center and zoom when coordinates change
-function MapViewSync({ center, zoom }) {
+const MapViewSync = memo(function MapViewSync({ center, zoom }) {
 	const map = useMap();
 
 	useEffect(() => {
@@ -450,8 +453,7 @@ function MapViewSync({ center, zoom }) {
 
 			// Check if center or zoom has changed
 			const centerChanged =
-				Math.abs(currentCenter.lat - center[0]) > 0.0001 ||
-				Math.abs(currentCenter.lng - center[1]) > 0.0001;
+				Math.abs(currentCenter.lat - center[0]) > 0.0001 || Math.abs(currentCenter.lng - center[1]) > 0.0001;
 			const zoomChanged = currentZoom !== zoom;
 
 			// Use setView to update both center and zoom efficiently
@@ -462,10 +464,10 @@ function MapViewSync({ center, zoom }) {
 	}, [map, center, zoom]);
 
 	return null;
-}
+});
 
 // Component to handle map loading state
-function MapLoadingHandler({ onMapReady }) {
+const MapLoadingHandler = memo(function MapLoadingHandler({ onMapReady }) {
 	const map = useMap();
 
 	useEffect(() => {
@@ -483,10 +485,10 @@ function MapLoadingHandler({ onMapReady }) {
 	}, [map, onMapReady]);
 
 	return null;
-}
+});
 
 // Fullscreen control component
-function FullscreenControl() {
+const FullscreenControl = memo(function FullscreenControl() {
 	const map = useMap();
 	const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -566,7 +568,10 @@ function FullscreenControl() {
 			const fullscreenBtn = container.querySelector('.leaflet-control-custom');
 			if (fullscreenBtn) {
 				fullscreenBtn.setAttribute('aria-pressed', isNowFullscreen ? 'true' : 'false');
-				fullscreenBtn.setAttribute('aria-label', isNowFullscreen ? 'Exit fullscreen map view' : 'Toggle fullscreen map view');
+				fullscreenBtn.setAttribute(
+					'aria-label',
+					isNowFullscreen ? 'Exit fullscreen map view' : 'Toggle fullscreen map view'
+				);
 			}
 
 			// Invalidate map size when entering/exiting fullscreen
@@ -590,7 +595,7 @@ function FullscreenControl() {
 	}, [map, isFullscreen]);
 
 	return null;
-}
+});
 
 const SIZE_PRESETS = {
 	small: { width: '300px', height: 200 },
@@ -713,14 +718,10 @@ export default function Edit({ attributes, setAttributes }) {
 			const errorMessage = error.message.includes('Rate limited')
 				? error.message
 				: __('Error searching for location. Please try again in a moment.', 'newopm');
-			dispatch('core/notices').createNotice(
-				'error',
-				errorMessage,
-				{
-					type: 'snackbar',
-					isDismissible: true,
-				}
-			);
+			dispatch('core/notices').createNotice('error', errorMessage, {
+				type: 'snackbar',
+				isDismissible: true,
+			});
 		} finally {
 			setIsSearching(false);
 		}
@@ -774,11 +775,14 @@ export default function Edit({ attributes, setAttributes }) {
 		[setAttributes]
 	);
 
-	// Cleanup debounce timeout on unmount
+	// Cleanup debounce timeouts on unmount
 	useEffect(() => {
 		return () => {
 			if (reverseGeocodeTimeout.current) {
 				clearTimeout(reverseGeocodeTimeout.current);
+			}
+			if (zoomTimeoutRef.current) {
+				clearTimeout(zoomTimeoutRef.current);
 			}
 		};
 	}, []);
@@ -791,9 +795,19 @@ export default function Edit({ attributes, setAttributes }) {
 		fetchAddress(latlng.lat, latlng.lng);
 	};
 
-	const handleZoomChange = newZoom => {
-		setAttributes({ zoom: newZoom });
-	};
+	// Debounce zoom changes to reduce attribute updates during zoom animation
+	const zoomTimeoutRef = useRef(null);
+	const handleZoomChange = useCallback(
+		newZoom => {
+			if (zoomTimeoutRef.current) {
+				clearTimeout(zoomTimeoutRef.current);
+			}
+			zoomTimeoutRef.current = setTimeout(() => {
+				setAttributes({ zoom: newZoom });
+			}, 150);
+		},
+		[setAttributes]
+	);
 
 	const clearMarker = () => {
 		setAttributes({
@@ -869,8 +883,12 @@ export default function Edit({ attributes, setAttributes }) {
 		}
 	};
 
-	const center = [latitude, longitude];
-	const markerPosition = markerLat && markerLon ? [markerLat, markerLon] : null;
+	// Memoize expensive calculations to prevent unnecessary re-renders
+	const center = useMemo(() => [latitude, longitude], [latitude, longitude]);
+	const markerPosition = useMemo(
+		() => (markerLat && markerLon ? [markerLat, markerLon] : null),
+		[markerLat, markerLon]
+	);
 
 	// Callback when map finishes loading
 	const handleMapReady = useCallback(() => {
@@ -1062,6 +1080,12 @@ export default function Edit({ attributes, setAttributes }) {
 							<TileLayer
 								attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 								url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+								maxZoom={19}
+								updateWhenIdle={true}
+								updateWhenZooming={false}
+								keepBuffer={2}
+								maxNativeZoom={19}
+								minZoom={2}
 							/>
 							<MapLoadingHandler onMapReady={handleMapReady} />
 							<MapViewSync center={center} zoom={zoom} />

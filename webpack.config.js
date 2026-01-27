@@ -14,7 +14,8 @@ module.exports = {
 	// Optimization configuration
 	optimization: {
 		...defaultConfig.optimization,
-		// Disable code splitting - bundle everything into single files
+		// Disable code splitting for WordPress compatibility
+		// WordPress block registration doesn't automatically handle split chunks
 		splitChunks: false,
 		// Minimize only in production
 		minimize: process.env.NODE_ENV === 'production',

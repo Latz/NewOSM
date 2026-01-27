@@ -8,3 +8,6 @@ build/
 # Test coverage
 coverage/
 .nyc_output/
+/FUTURE_OPTIMIZATIONS.md
+/PERFORMANCE_OPTIMIZATIONS.md
+/TROUBLESHOOTING.md

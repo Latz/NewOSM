@@ -1,0 +1,460 @@
+I'll conduct a comprehensive code review of your WordPress plugin. Let me start by exploring the codebase structure and gathering information about the code.
+
+Now let me examine the key files more closely:
+
+Let me check the styling files and view.js more closely:
+
+Now let me check the CHANGELOG and README to understand the project history:
+
+Perfect! Now I have a comprehensive understanding of the codebase. Let me create a detailed code review.
+
+## 📋 Code Review: NewOSM WordPress Plugin
+
+I've completed a comprehensive code review of your OpenStreetMap WordPress plugin. Here's my detailed analysis:
+
+---
+
+## ✅ **Strengths**
+
+### 1. **Architecture & Organization**
+- Clean separation of concerns (PHP backend, React frontend)
+- Well-structured file organization
+- Good use of WordPress and Gutenberg APIs
+- Proper use of modern React patterns (hooks, functional components)
+
+### 2. **Code Quality**
+- Excellent documentation with PHPDoc comments
+- Good error handling in REST API endpoints
+- Proper sanitization and validation of user inputs
+- Well-commented JavaScript code
+
+### 3. **User Experience**
+- Intuitive click vs drag detection (3px threshold)
+- Bidirectional zoom synchronization
+- Reverse geocoding for automatic address lookup
+- Fullscreen support
+- Size presets for quick configuration
+
+### 4. **Security**
+- Proper nonce handling (WordPress native)
+- Input sanitization in PHP
+- Permission checks on REST endpoints
+- ABSPATH check to prevent direct access
+
+---
+
+## 🔴 **Critical Issues**
+
+### 1. **Hardcoded Plugin Path (Security & Portability)**
+````javascript path=src/edit.js mode=EXCERPT
+const pluginUrl = window.location.origin + '/wp-content/plugins/NewOSM';
+````
+
+**Problem:** This breaks if:
+- WordPress is in a subdirectory
+- Plugin folder is renamed
+- Site uses custom `wp-content` directory
+
+**Solution:** Pass the plugin URL from PHP via `wp_localize_script`:
+
+```php
+// In newopm.php
+function newopm_enqueue_editor_assets() {
+    wp_localize_script('newopm-osm-map-editor-script', 'newOpmData', array(
+        'pluginUrl' => NEWOPM_PLUGIN_URL
+    ));
+}
+```
+
+```javascript
+// In edit.js
+const pluginUrl = window.newOpmData?.pluginUrl || '';
+```
+
+### 2. **Missing Nonce Verification**
+````php path=newopm.php mode=EXCERPT
+// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+if (isset($_GET['settings-updated']) && $_GET['settings-updated']) {
+````
+
+**Problem:** While the comment acknowledges it, WordPress settings pages should verify nonces.
+
+**Solution:** WordPress handles this automatically via `settings_fields()`, but the comment is misleading. The code is actually correct.
+
+### 3. **REST API Public Access**
+````php path=newopm.php mode=EXCERPT
+'permission_callback' => '__return_true' // Public access for reading defaults
+````
+
+**Problem:** Anyone can read your default settings. While not highly sensitive, it's unnecessary exposure.
+
+**Solution:** Restrict to authenticated users:
+```php
+'permission_callback' => 'is_user_logged_in'
+```
+
+---
+
+## ⚠️ **Major Issues**
+
+### 4. **Nominatim API Rate Limiting**
+````javascript path=src/edit.js mode=EXCERPT
+const response = await fetch(
+    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`,
+    {
+        headers: {
+            'User-Agent': 'WordPress-NewOSM-Plugin/1.0'
+        }
+    }
+);
+````
+
+**Problem:** 
+- No rate limiting implementation
+- No caching
+- Violates Nominatim usage policy (max 1 request/second)
+- Could get your IP banned
+
+**Solution:** 
+1. Implement debouncing (wait 1 second between requests)
+2. Add caching for repeated searches
+3. Consider using a proxy endpoint in PHP to control rate limiting
+4. Add error handling for 429 (Too Many Requests)
+
+### 5. **Missing Error Boundaries**
+The React components have no error boundaries. If Leaflet fails to load or throws an error, the entire editor could crash.
+
+**Solution:** Add React error boundary:
+```javascript
+class MapErrorBoundary extends React.Component {
+    state = { hasError: false };
+    
+    static getDerivedStateFromError(error) {
+        return { hasError: true };
+    }
+    
+    render() {
+        if (this.state.hasError) {
+            return <div>Map failed to load. Please refresh.</div>;
+        }
+        return this.props.children;
+    }
+}
+```
+
+### 6. **Memory Leaks in Event Listeners**
+````javascript path=src/view.js mode=EXCERPT
+document.addEventListener('fullscreenchange', handleFullscreenChange);
+document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+````
+
+**Problem:** Event listeners are added but never removed if the map is destroyed/re-initialized.
+
+**Solution:** Store references and clean up:
+```javascript
+// Store in a cleanup array
+const cleanupFunctions = [];
+cleanupFunctions.push(() => {
+    document.removeEventListener('fullscreenchange', handleFullscreenChange);
+});
+```
+
+### 7. **Inconsistent Text Domain**
+Plugin header says `newopm` but the plugin name is `NewOSM`. This could cause translation issues.
+
+---
+
+## 🟡 **Moderate Issues**
+
+### 8. **No Loading States for Map Initialization**
+Users see nothing while Leaflet loads. Add a loading spinner.
+
+### 9. **Magic Numbers**
+````javascript path=src/edit.js mode=EXCERPT
+if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+````
+
+**Solution:** Use named constants:
+```javascript
+const DRAG_THRESHOLD_PX = 3;
+if (Math.abs(dx) > DRAG_THRESHOLD_PX || Math.abs(dy) > DRAG_THRESHOLD_PX) {
+```
+
+### 10. **Duplicate Code in Fullscreen Handlers**
+The fullscreen CSS is repeated 4 times for different vendor prefixes. Use a mixin or CSS variables.
+
+### 11. **No Accessibility (A11y) Support**
+- No ARIA labels
+- No keyboard navigation for marker placement
+- No screen reader support
+- Fullscreen button has no accessible label
+
+**Solution:**
+```javascript
+button.setAttribute('aria-label', 'Toggle Fullscreen');
+button.setAttribute('role', 'button');
+```
+
+### 12. **Missing Validation in Frontend**
+````javascript path=src/save.js mode=EXCERPT
+const mapId = `newopm-map-${Math.random().toString(36).substr(2, 9)}`;
+````
+
+**Problem:** `substr` is deprecated. Use `substring` or `slice`.
+
+### 13. **No Internationalization in JavaScript**
+All strings are hardcoded in English. Use `@wordpress/i18n`:
+```javascript
+import { __ } from '@wordpress/i18n';
+alert(__('Location not found', 'newopm'));
+```
+
+---
+
+## 🔵 **Minor Issues & Improvements**
+
+### 14. **Console.log Statements in Production**
+````javascript path=src/edit.js mode=EXCERPT
+console.log('Saving defaults:', { sizePreset, height, width, zoom, latitude, longitude, markerLat, markerLon, markerLabel });
+````
+
+**Solution:** Remove or wrap in development check:
+```javascript
+if (process.env.NODE_ENV === 'development') {
+    console.log('Saving defaults:', ...);
+}
+```
+
+### 15. **Alert() Usage**
+Using `alert()` is not user-friendly. Use WordPress notices instead:
+```javascript
+import { dispatch } from '@wordpress/data';
+dispatch('core/notices').createNotice(
+    'success',
+    __('Settings saved successfully', 'newopm'),
+    { type: 'snackbar' }
+);
+```
+
+### 16. **Unused Dependencies Check**
+Run `npm ls` to verify all dependencies are actually used.
+
+### 17. **No TypeScript**
+Consider migrating to TypeScript for better type safety, especially with complex Leaflet types.
+
+### 18. **Missing .gitignore Entries**
+Ensure `node_modules/` and `build/` are in `.gitignore`.
+
+### 19. **No Unit Tests**
+No test coverage. Consider adding Jest tests for critical functions.
+
+### 20. **Webpack Config Could Use Optimization**
+````javascript path=webpack.config.js mode=EXCERPT
+module.exports = {
+    ...defaultConfig,
+    entry: {
+        index: path.resolve(process.cwd(), 'src', 'index.js'),
+        view: path.resolve(process.cwd(), 'src', 'view.js'),
+    },
+};
+````
+
+**Suggestion:** Add source maps for development:
+```javascript
+devtool: process.env.NODE_ENV === 'development' ? 'source-map' : false,
+```
+
+---
+
+## 📊 **Performance Concerns**
+
+### 21. **Map Re-renders**
+````javascript path=src/edit.js mode=EXCERPT
+setMapKey(prev => prev + 1); // Force map to re-center
+````
+
+**Problem:** Completely destroys and recreates the map. This is expensive.
+
+**Solution:** Use `map.setView()` instead:
+```javascript
+const map = useMap();
+useEffect(() => {
+    map.setView([latitude, longitude], zoom);
+}, [latitude, longitude, zoom]);
+```
+
+### 22. **No Debouncing on Marker Drag**
+Every pixel of drag triggers a reverse geocoding request.
+
+**Solution:** Debounce the `fetchAddress` call:
+```javascript
+import { debounce } from 'lodash';
+const debouncedFetchAddress = debounce(fetchAddress, 500);
+```
+
+### 23. **Leaflet Loaded from CDN**
+````php path=newopm.php mode=EXCERPT
+wp_enqueue_script(
+    'leaflet-js',
+    'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+````
+
+**Problem:** 
+- External dependency (fails if unpkg is down)
+- No SRI (Subresource Integrity) hash
+- Privacy concern (external request)
+
+**Solution:** Bundle Leaflet locally or add SRI:
+```php
+wp_enqueue_script(
+    'leaflet-js',
+    'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+    array(),
+    '1.9.4',
+    array(
+        'in_footer' => true,
+        'integrity' => 'sha384-...',
+        'crossorigin' => 'anonymous'
+    )
+);
+```
+
+---
+
+## 🎯 **Best Practices Violations**
+
+### 24. **Direct DOM Manipulation in React**
+````javascript path=src/edit.js mode=EXCERPT
+container.style.cursor = 'crosshair';
+````
+
+**Problem:** Mixing React and imperative DOM updates can cause issues.
+
+**Solution:** Use state and className:
+```javascript
+const [cursor, setCursor] = useState('crosshair');
+<div style={{ cursor }}>
+```
+
+### 25. **Missing Plugin Deactivation Hook**
+You have `uninstall.php` but no deactivation hook. Consider adding one to clean up transients.
+
+### 26. **No Version Migration Logic**
+When updating from 1.0.0 to 1.1.0, there's no migration for existing blocks.
+
+---
+
+## 🔒 **Security Recommendations**
+
+1. **Add Content Security Policy (CSP) headers** for the admin page
+2. **Validate latitude/longitude ranges** in JavaScript (currently only in PHP)
+3. **Escape all output** - some places use `esc_attr()` but verify all user input is escaped
+4. **Add rate limiting** to REST API endpoints to prevent abuse
+
+---
+
+## 📝 **Documentation Improvements**
+
+1. **Add inline code examples** in README for common use cases
+2. **Document the REST API endpoints** for developers
+3. **Add troubleshooting section** for common issues
+4. **Include screenshots** in README
+5. **Add CONTRIBUTING.md** if you plan to accept contributions
+
+---
+
+## 🧪 **Testing Recommendations**
+
+1. **Add unit tests** for PHP functions (PHPUnit)
+2. **Add JavaScript tests** (Jest + React Testing Library)
+3. **Add E2E tests** (Playwright or Cypress)
+4. **Test with different WordPress themes** (Twenty Twenty-Four, etc.)
+5. **Test with different PHP versions** (7.4, 8.0, 8.1, 8.2)
+6. **Test accessibility** with screen readers
+
+---
+
+## 🎨 **Code Style**
+
+Overall code style is good, but consider:
+1. **Add ESLint** configuration for consistent JavaScript style
+2. **Add PHP_CodeSniffer** with WordPress coding standards
+3. **Add Prettier** for automatic formatting
+4. **Add pre-commit hooks** (Husky) to enforce standards
+
+---
+
+## 📦 **Dependency Management**
+
+````json path=package.json mode=EXCERPT
+"dependencies": {
+    "leaflet": "^1.9.4",
+    "react-leaflet": "^4.2.1"
+}
+````
+
+**Recommendations:**
+1. **Pin exact versions** in production (remove `^`)
+2. **Add `package-lock.json`** to version control
+3. **Run `npm audit`** regularly
+4. **Consider adding `renovate` or `dependabot`** for automated updates
+
+---
+
+## 🚀 **Performance Optimizations**
+
+1. **Lazy load Leaflet** only when block is used
+2. **Use `wp_add_inline_script`** to pass data instead of global variables
+3. **Minify and concatenate assets** in production
+4. **Add caching headers** for static assets
+5. **Consider using a CDN** for Leaflet assets
+
+---
+
+## 🎯 **Priority Action Items**
+
+### High Priority (Fix Now)
+1. ✅ Fix hardcoded plugin path
+2. ✅ Implement Nominatim rate limiting
+3. ✅ Add error boundaries
+4. ✅ Fix memory leaks in event listeners
+5. ✅ Add accessibility labels
+
+### Medium Priority (Next Release)
+6. Replace `alert()` with WordPress notices
+7. Add internationalization to JavaScript
+8. Remove console.log statements
+9. Add debouncing to marker drag
+10. Bundle Leaflet locally
+
+### Low Priority (Future Enhancement)
+11. Add TypeScript
+12. Add unit tests
+13. Add E2E tests
+14. Improve documentation
+15. Add migration logic
+
+---
+
+## 📈 **Overall Assessment**
+
+**Grade: B+ (85/100)**
+
+**Strengths:**
+- Solid architecture and code organization
+- Good user experience features
+- Proper WordPress integration
+- Well-documented PHP code
+
+**Areas for Improvement:**
+- Security hardening (API access, rate limiting)
+- Performance optimization (debouncing, caching)
+- Accessibility compliance
+- Testing coverage
+- Production-ready error handling
+
+**Recommendation:** This is a well-built plugin with good fundamentals. Address the critical and major issues before releasing to a wider audience. The codebase shows good understanding of WordPress and React best practices, but needs polish for production use.
+
+---
+
+Would you like me to help you fix any of these issues? I can start with the highest priority items.

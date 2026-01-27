@@ -9,7 +9,8 @@
     "test:watch": "wp-scripts test-unit-js --watch"
   },
   "devDependencies": {
-    "@wordpress/scripts": "^19.2.4"
+    "@wordpress/scripts": "^19.2.4",
+    "copy-webpack-plugin": "^13.0.1"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

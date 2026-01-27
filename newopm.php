@@ -77,28 +77,32 @@ function newopm_filter_block_metadata($metadata) {
  * @return void
  */
 function newopm_register_block() {
-    error_log('NewOSM: newopm_register_block() called');
-    error_log('NewOSM: Build dir: ' . NEWOPM_PLUGIN_DIR . 'build');
-    error_log('NewOSM: Build dir exists: ' . (file_exists(NEWOPM_PLUGIN_DIR . 'build') ? 'yes' : 'no'));
-    error_log('NewOSM: block.json exists: ' . (file_exists(NEWOPM_PLUGIN_DIR . 'build/block.json') ? 'yes' : 'no'));
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('NewOSM: newopm_register_block() called');
+        error_log('NewOSM: Build dir: ' . NEWOPM_PLUGIN_DIR . 'build');
+        error_log('NewOSM: Build dir exists: ' . (file_exists(NEWOPM_PLUGIN_DIR . 'build') ? 'yes' : 'no'));
+        error_log('NewOSM: block.json exists: ' . (file_exists(NEWOPM_PLUGIN_DIR . 'build/block.json') ? 'yes' : 'no'));
+    }
 
     $metadata = register_block_type(NEWOPM_PLUGIN_DIR . 'build');
 
-    if ($metadata) {
-        error_log('NewOSM: Block registered successfully - ' . $metadata->name);
-        error_log('NewOSM: Editor script: ' . print_r($metadata->editor_script, true));
-        error_log('NewOSM: Editor style: ' . print_r($metadata->editor_style, true));
-    } else {
-        error_log('NewOSM: Block registration FAILED');
-    }
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        if ($metadata) {
+            error_log('NewOSM: Block registered successfully - ' . $metadata->name);
+            error_log('NewOSM: Editor script: ' . print_r($metadata->editor_script, true));
+            error_log('NewOSM: Editor style: ' . print_r($metadata->editor_style, true));
+        } else {
+            error_log('NewOSM: Block registration FAILED');
+        }
 
-    // Log registered scripts
-    global $wp_scripts;
-    if ($wp_scripts) {
-        error_log('NewOSM: Checking registered scripts...');
-        foreach ($wp_scripts->registered as $handle => $script) {
-            if (strpos($handle, 'newopm') !== false || strpos($handle, 'osm-map') !== false) {
-                error_log('NewOSM: Found script - Handle: ' . $handle . ' | Src: ' . $script->src);
+        // Log registered scripts
+        global $wp_scripts;
+        if ($wp_scripts) {
+            error_log('NewOSM: Checking registered scripts...');
+            foreach ($wp_scripts->registered as $handle => $script) {
+                if (strpos($handle, 'newopm') !== false || strpos($handle, 'osm-map') !== false) {
+                    error_log('NewOSM: Found script - Handle: ' . $handle . ' | Src: ' . $script->src);
+                }
             }
         }
     }
@@ -142,7 +146,9 @@ add_action('init', 'newopm_register_block');
  * @return void
  */
 function newopm_localize_editor_script() {
-    error_log('NewOSM: newopm_localize_editor_script() called');
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('NewOSM: newopm_localize_editor_script() called');
+    }
 
     // Get the editor script handle from the asset file
     $asset_file = include(NEWOPM_PLUGIN_DIR . 'build/index.asset.php');
@@ -151,14 +157,18 @@ function newopm_localize_editor_script() {
     // based on the block name in block.json
     $script_handle = 'newopm-osm-map-editor-script';
 
-    error_log('NewOSM: Looking for script handle: ' . $script_handle);
-    error_log('NewOSM: Script is registered: ' . (wp_script_is($script_handle, 'registered') ? 'yes' : 'no'));
-    error_log('NewOSM: Script is enqueued: ' . (wp_script_is($script_handle, 'enqueued') ? 'yes' : 'no'));
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('NewOSM: Looking for script handle: ' . $script_handle);
+        error_log('NewOSM: Script is registered: ' . (wp_script_is($script_handle, 'registered') ? 'yes' : 'no'));
+        error_log('NewOSM: Script is enqueued: ' . (wp_script_is($script_handle, 'enqueued') ? 'yes' : 'no'));
+    }
 
     // Try to manually enqueue if not enqueued
     if (!wp_script_is($script_handle, 'enqueued') && wp_script_is($script_handle, 'registered')) {
         wp_enqueue_script($script_handle);
-        error_log('NewOSM: Manually enqueued script');
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('NewOSM: Manually enqueued script');
+        }
     }
 
     // Check if the script is registered before localizing
@@ -172,9 +182,13 @@ function newopm_localize_editor_script() {
                 'version' => NEWOPM_VERSION,
             )
         );
-        error_log('NewOSM: Script localized successfully');
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('NewOSM: Script localized successfully');
+        }
     } else {
-        error_log('NewOSM: Script NOT registered, cannot localize');
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('NewOSM: Script NOT registered, cannot localize');
+        }
     }
 }
 add_action('enqueue_block_editor_assets', 'newopm_localize_editor_script', 20);
@@ -183,7 +197,7 @@ add_action('enqueue_block_editor_assets', 'newopm_localize_editor_script', 20);
  * Debug: Check what scripts are actually enqueued
  */
 function newopm_debug_enqueued_scripts() {
-    if (!is_admin()) {
+    if (!is_admin() || !(defined('WP_DEBUG') && WP_DEBUG)) {
         return;
     }
 
@@ -222,13 +236,16 @@ function newopm_enqueue_frontend_assets() {
             '1.9.4'
         );
 
-        // Enqueue Leaflet JS
+        // Enqueue Leaflet JS with defer strategy for non-blocking load
         wp_enqueue_script(
             'leaflet-js',
             'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
             array(),
             '1.9.4',
-            true
+            array(
+                'in_footer' => true,
+                'strategy' => 'defer', // Non-blocking load for better performance
+            )
         );
     }
 }
@@ -276,7 +293,9 @@ add_action('wp_enqueue_scripts', 'newopm_localize_frontend_script', 20);
  * @return void
  */
 function newopm_enqueue_editor_assets() {
-    error_log('NewOSM: newopm_enqueue_editor_assets() called on screen: ' . get_current_screen()->id);
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('NewOSM: newopm_enqueue_editor_assets() called on screen: ' . get_current_screen()->id);
+    }
 
     // Enqueue Leaflet CSS
     wp_enqueue_style(
@@ -286,16 +305,21 @@ function newopm_enqueue_editor_assets() {
         '1.9.4'
     );
 
-    // Manually enqueue Leaflet JS for the editor
+    // Manually enqueue Leaflet JS for the editor with defer strategy
     wp_enqueue_script(
         'leaflet-js',
         'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
         array(),
         '1.9.4',
-        true
+        array(
+            'in_footer' => true,
+            'strategy' => 'defer', // Non-blocking load for better performance
+        )
     );
 
-    error_log('NewOSM: Leaflet assets enqueued');
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('NewOSM: Leaflet assets enqueued');
+    }
 }
 add_action('enqueue_block_editor_assets', 'newopm_enqueue_editor_assets');
 
