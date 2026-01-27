@@ -101,6 +101,16 @@ img.leaflet-tile {
     color: #333;
 }
 
+// Fullscreen button centering fix
+.leaflet-control-custom {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+    text-align: center !important;
+}
+
 // Fullscreen styles mixin
 @mixin fullscreen-map {
     width: 100vw !important;
