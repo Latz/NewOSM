@@ -136,7 +136,7 @@ L.Icon.Default.mergeOptions({
 /**
  * Component to handle map interactions (clicks and zoom changes)
  */
-function MapInteractionHandler({ onMapClick, onZoomChange, isSelected }) {
+function MapInteractionHandler({ onMapClick, onZoomChange, onCenterChange, isSelected }) {
 	const map = useMap();
 	const isDraggingRef = useRef(false);
 	const dragStartRef = useRef(null);
@@ -154,7 +154,16 @@ function MapInteractionHandler({ onMapClick, onZoomChange, isSelected }) {
 			onZoomChange(zoom);
 		};
 
+		// Handle center changes from panning
+		const handleMoveEnd = () => {
+			if (onCenterChange) {
+				const center = map.getCenter();
+				onCenterChange(center);
+			}
+		};
+
 		map.on('zoomend', handleZoomEnd);
+		map.on('moveend', handleMoveEnd);
 
 		// Custom drag implementation
 		const mapContainer = map.getContainer();
@@ -239,11 +248,12 @@ function MapInteractionHandler({ onMapClick, onZoomChange, isSelected }) {
 			mapContainer.removeEventListener('mouseleave', handleMouseLeave);
 			document.removeEventListener('mouseup', handleGlobalMouseUp);
 			map.off('zoomend', handleZoomEnd);
+			map.off('moveend', handleMoveEnd);
 			if (map.dragging) {
 				map.dragging.enable();
 			}
 		};
-	}, [map, onMapClick, onZoomChange, isSelected]);
+	}, [map, onMapClick, onZoomChange, onCenterChange, isSelected]);
 
 	return null;
 }
@@ -454,6 +464,7 @@ export default function MapEditor({
 	isSelected,
 	onMapClick,
 	onZoomChange,
+	onCenterChange,
 	onMarkerDrag,
 	onMapReady,
 }) {
@@ -490,7 +501,7 @@ export default function MapEditor({
 					<MapLoadingHandler onMapReady={onMapReady} />
 					<MapViewSync center={center} zoom={zoom} />
 					<FullscreenControl />
-					<MapInteractionHandler onMapClick={onMapClick} onZoomChange={onZoomChange} isSelected={isSelected} />
+					<MapInteractionHandler onMapClick={onMapClick} onZoomChange={onZoomChange} onCenterChange={onCenterChange} isSelected={isSelected} />
 					{markerPosition && <DraggableMarker position={markerPosition} onDragEnd={onMarkerDrag} label={markerLabel} />}
 				</MapContainer>
 				{isMapLoading && (

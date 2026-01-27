@@ -398,6 +398,9 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 			if (zoomTimeoutRef.current) {
 				clearTimeout(zoomTimeoutRef.current);
 			}
+			if (centerTimeoutRef.current) {
+				clearTimeout(centerTimeoutRef.current);
+			}
 		};
 	}, []);
 
@@ -436,6 +439,23 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 			}
 			zoomTimeoutRef.current = setTimeout(() => {
 				setAttributes({ zoom: newZoom });
+			}, 150);
+		},
+		[setAttributes]
+	);
+
+	// Debounce center changes to reduce attribute updates during panning
+	const centerTimeoutRef = useRef(null);
+	const handleCenterChange = useCallback(
+		newCenter => {
+			if (centerTimeoutRef.current) {
+				clearTimeout(centerTimeoutRef.current);
+			}
+			centerTimeoutRef.current = setTimeout(() => {
+				setAttributes({
+					latitude: newCenter.lat,
+					longitude: newCenter.lng,
+				});
 			}, 150);
 		},
 		[setAttributes]
@@ -704,6 +724,7 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 						isSelected={isSelected}
 						onMapClick={handleMapClick}
 						onZoomChange={handleZoomChange}
+						onCenterChange={handleCenterChange}
 						onMarkerDrag={handleMarkerDrag}
 						onMapReady={handleMapReady}
 					/>
