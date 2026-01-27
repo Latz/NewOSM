@@ -604,35 +604,23 @@ export default function Edit({ attributes, setAttributes }) {
 
 					{markerPosition && (
 						<div style={{ marginTop: '12px', padding: '12px', background: '#f0f0f0', borderRadius: '4px' }}>
-							<p style={{ margin: '0 0 8px 0', fontWeight: 'bold' }}>
-								Marker Position{' '}
-								{isLoadingAddress && (
-									<span style={{ fontSize: '11px', fontWeight: 'normal' }}>(loading address...)</span>
-								)}
-							</p>
+							<p style={{ margin: '0 0 4px 0', fontWeight: 'bold' }}>Marker Position</p>
 
-							{markerAddress && (
-								<div
-									style={{
-										marginBottom: '12px',
-										padding: '8px',
-										background: '#e8f4f8',
-										borderRadius: '4px',
-										border: '1px solid #0073aa',
-									}}
-								>
-									<p style={{ margin: '0', fontSize: '11px', fontWeight: 'bold', color: '#0073aa' }}>Address:</p>
-									<p style={{ margin: '4px 0 0 0', fontSize: '12px', lineHeight: '1.4' }}>{markerAddress}</p>
-								</div>
+							{isLoadingAddress && (
+								<p style={{ margin: '0 0 8px 0', fontSize: '12px', fontStyle: 'italic', color: '#666' }}>
+									Loading address...
+								</p>
 							)}
 
-							<p style={{ margin: '0 0 12px 0', fontSize: '12px' }}>
-								<strong>Coordinates:</strong>
-								<br />
-								Lat: {markerLat.toFixed(5)}
-								<br />
-								Lon: {markerLon.toFixed(5)}
-							</p>
+							{markerAddress && (
+								<p style={{ margin: '0 0 12px 0', fontSize: '13px', lineHeight: '1.4' }}>{markerAddress}</p>
+							)}
+
+							{!isLoadingAddress && !markerAddress && (
+								<p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#666' }}>
+									Lat: {markerLat.toFixed(5)}, Lon: {markerLon.toFixed(5)}
+								</p>
+							)}
 
 							<TextControl
 								label='Marker Label (optional)'
