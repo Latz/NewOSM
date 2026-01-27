@@ -352,6 +352,7 @@ function FullscreenControl() {
 			button.style.cursor = 'pointer';
 			button.style.border = '2px solid rgba(0,0,0,0.2)';
 			button.style.borderRadius = '4px';
+			button.style.color = '#333';
 
 			button.setAttribute('aria-label', 'Toggle fullscreen map view');
 			button.setAttribute('role', 'button');
