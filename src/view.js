@@ -219,6 +219,11 @@ function addFullscreenControl(map, mapElement) {
 		button.style.border = '2px solid rgba(0,0,0,0.2)';
 		button.style.borderRadius = '4px';
 		button.style.color = '#333';
+		button.style.display = 'flex';
+		button.style.alignItems = 'center';
+		button.style.justifyContent = 'center';
+		button.style.padding = '0';
+		button.style.lineHeight = '1';
 
 		// Accessibility attributes
 		button.setAttribute('aria-label', 'Toggle fullscreen map view');
