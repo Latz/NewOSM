@@ -291,6 +291,8 @@ function MapViewSync({ center, zoom }) {
 				currentZoom !== zoom
 			) {
 				map.setView(center, zoom, { animate: true });
+				// Ensure tiles load after view change
+				setTimeout(() => map.invalidateSize(), 100);
 			}
 		});
 	}, [map, center, zoom]);
@@ -308,11 +310,18 @@ function MapLoadingHandler({ onMapReady }) {
 		if (!map) return;
 
 		map.whenReady(() => {
+			// Force map to recalculate size after lazy loading
 			setTimeout(() => {
-				if (onMapReady) {
-					onMapReady();
-				}
-			}, 100);
+				map.invalidateSize();
+
+				// Load tiles that might have been missed
+				setTimeout(() => {
+					map.invalidateSize();
+					if (onMapReady) {
+						onMapReady();
+					}
+				}, 100);
+			}, 50);
 		});
 	}, [map, onMapReady]);
 
@@ -464,9 +473,9 @@ export default function MapEditor({
 						attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 						url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 						maxZoom={19}
-						updateWhenIdle={true}
-						updateWhenZooming={false}
-						keepBuffer={2}
+						updateWhenIdle={false}
+						updateWhenZooming={true}
+						keepBuffer={4}
 						maxNativeZoom={19}
 						minZoom={2}
 					/>
