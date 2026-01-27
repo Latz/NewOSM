@@ -3,6 +3,9 @@
  * This script initializes Leaflet maps on the frontend
  */
 
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
 // Store map instances and cleanup functions for proper disposal
 const mapInstances = new WeakMap(); // Maps DOM elements to { map, cleanup }
 
