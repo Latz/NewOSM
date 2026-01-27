@@ -602,15 +602,6 @@ export default function Edit({ attributes, setAttributes }) {
 						Save Current Settings as Default
 					</Button>
 
-					<div style={{ marginTop: '16px', padding: '12px', background: '#f0f0f0', borderRadius: '4px' }}>
-						<p style={{ margin: '0 0 8px 0', fontWeight: 'bold' }}>Map Center:</p>
-						<p style={{ margin: '0', fontSize: '12px' }}>
-							Lat: {latitude.toFixed(5)}
-							<br />
-							Lon: {longitude.toFixed(5)}
-						</p>
-					</div>
-
 					{markerPosition && (
 						<div style={{ marginTop: '12px', padding: '12px', background: '#f0f0f0', borderRadius: '4px' }}>
 							<p style={{ margin: '0 0 8px 0', fontWeight: 'bold' }}>
