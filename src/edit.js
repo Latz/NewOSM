@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, lazy, Suspense } from '@wordpress/element';
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from '@wordpress/element';
 import { InspectorControls, useBlockProps } from '@wordpress/block-editor';
 import { PanelBody, TextControl, RangeControl, Button, SelectControl, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
@@ -139,6 +139,14 @@ class NominatimRateLimiter {
 
 // Create a singleton instance
 const nominatimAPI = new NominatimRateLimiter();
+
+// Size presets for the map
+const SIZE_PRESETS = {
+	small: { width: '300px', height: 200 },
+	medium: { width: '100%', height: 400 },
+	large: { width: '100%', height: 600 },
+	fullscreen: { width: '100%', height: 800 },
+};
 
 // Custom pan handler that doesn't get stuck
 export default function Edit({ attributes, setAttributes }) {
