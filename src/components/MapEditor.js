@@ -469,7 +469,7 @@ export default function MapEditor({
 					center={center}
 					zoom={zoom}
 					style={{ height: '100%', width: '100%' }}
-					scrollWheelZoom={true}
+					scrollWheelZoom={'center'}
 					dragging={true}
 					touchZoom={true}
 					doubleClickZoom={true}
