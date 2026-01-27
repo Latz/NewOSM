@@ -1,144 +1,13 @@
-import { useState, useEffect, useRef, useCallback, Component, memo, useMemo } from '@wordpress/element';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from '@wordpress/element';
 import { InspectorControls, useBlockProps } from '@wordpress/block-editor';
-import { PanelBody, TextControl, RangeControl, Button, SelectControl, ToggleControl } from '@wordpress/components';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
+import { PanelBody, TextControl, RangeControl, Button, SelectControl, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import { __ } from '@wordpress/i18n';
 import { dispatch } from '@wordpress/data';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 
-/**
- * Error Boundary Component
- * Catches errors in map components to prevent entire editor from crashing
- */
-class MapErrorBoundary extends Component {
-	constructor(props) {
-		super(props);
-		this.state = {
-			hasError: false,
-			error: null,
-			errorInfo: null,
-		};
-	}
-
-	static getDerivedStateFromError(error) {
-		// Update state so the next render will show the fallback UI
-		return { hasError: true };
-	}
-
-	componentDidCatch(error, errorInfo) {
-		// Log error details for debugging
-		console.error('Map component error:', error, errorInfo);
-		this.setState({
-			error,
-			errorInfo,
-		});
-	}
-
-	handleReset = () => {
-		// Reset error state and attempt to re-render
-		this.setState({
-			hasError: false,
-			error: null,
-			errorInfo: null,
-		});
-	};
-
-	render() {
-		if (this.state.hasError) {
-			return (
-				<div
-					style={{
-						padding: '20px',
-						border: '2px solid #dc3232',
-						borderRadius: '4px',
-						backgroundColor: '#fef7f7',
-						color: '#444',
-					}}
-				>
-					<h3 style={{ margin: '0 0 12px 0', color: '#dc3232' }}>{__('Map Failed to Load', 'newopm')}</h3>
-					<p style={{ margin: '0 0 12px 0' }}>
-						{__('The map component encountered an error and could not be displayed. This may be due to:', 'newopm')}
-					</p>
-					<ul style={{ margin: '0 0 16px 20px' }}>
-						<li>{__('Network connectivity issues', 'newopm')}</li>
-						<li>{__('Leaflet library failed to load', 'newopm')}</li>
-						<li>{__('Invalid map configuration', 'newopm')}</li>
-						<li>{__('Browser compatibility issues', 'newopm')}</li>
-					</ul>
-					{this.state.error && (
-						<details style={{ marginBottom: '16px' }}>
-							<summary style={{ cursor: 'pointer', fontWeight: 'bold', marginBottom: '8px' }}>
-								{__('Error Details (for debugging)', 'newopm')}
-							</summary>
-							<pre
-								style={{
-									backgroundColor: '#f5f5f5',
-									padding: '10px',
-									borderRadius: '4px',
-									fontSize: '12px',
-									overflow: 'auto',
-									maxHeight: '200px',
-								}}
-							>
-								{this.state.error.toString()}
-								{this.state.errorInfo && this.state.errorInfo.componentStack}
-							</pre>
-						</details>
-					)}
-					<div style={{ display: 'flex', gap: '8px' }}>
-						<button
-							onClick={this.handleReset}
-							style={{
-								padding: '8px 16px',
-								backgroundColor: '#2271b1',
-								color: 'white',
-								border: 'none',
-								borderRadius: '3px',
-								cursor: 'pointer',
-							}}
-						>
-							{__('Try Again', 'newopm')}
-						</button>
-						<button
-							onClick={() => window.location.reload()}
-							style={{
-								padding: '8px 16px',
-								backgroundColor: '#dcdcdc',
-								color: '#2c3338',
-								border: 'none',
-								borderRadius: '3px',
-								cursor: 'pointer',
-							}}
-						>
-							{__('Reload Page', 'newopm')}
-						</button>
-					</div>
-				</div>
-			);
-		}
-
-		return this.props.children;
-	}
-}
-
-// Fix for default marker icons in Leaflet with Webpack
-delete L.Icon.Default.prototype._getIconUrl;
-
-// Get plugin URL from localized script data (passed from PHP)
-// This data is localized in newopm.php via wp_localize_script()
-if (typeof window.newOpmData === 'undefined' || !window.newOpmData.pluginUrl) {
-	console.error('NewOSM: Plugin URL not available. Make sure wp_localize_script is working correctly.');
-}
-
-const pluginUrl = window.newOpmData?.pluginUrl?.replace(/\/$/, '') || '';
-
-L.Icon.Default.mergeOptions({
-	iconRetinaUrl: pluginUrl + '/assets/leaflet/marker-icon-2x.png',
-	iconUrl: pluginUrl + '/assets/leaflet/marker-icon.png',
-	shadowUrl: pluginUrl + '/assets/leaflet/marker-shadow.png',
-});
+// Lazy load the heavy map editor component
+// This improves initial editor load time by deferring ~440KB of Leaflet code
+const MapEditor = lazy(() => import('./components/MapEditor'));
 
 /**
  * Rate limiter for Nominatim API requests
@@ -272,339 +141,6 @@ class NominatimRateLimiter {
 const nominatimAPI = new NominatimRateLimiter();
 
 // Custom pan handler that doesn't get stuck
-const MapInteractionHandler = memo(function MapInteractionHandler({ onMapClick, onZoomChange }) {
-	const map = useMap();
-	const isDragging = useRef(false);
-	const dragStart = useRef(null);
-	const mapStartCenter = useRef(null);
-
-	useEffect(() => {
-		if (!map) return;
-
-		// Disable Leaflet's built-in dragging completely
-		map.dragging.disable();
-
-		// Listen for zoom changes and update the attribute
-		const handleZoomEnd = () => {
-			const newZoom = map.getZoom();
-			onZoomChange(newZoom);
-		};
-
-		map.on('zoomend', handleZoomEnd);
-
-		const container = map.getContainer();
-
-		const handleMouseDown = e => {
-			// Don't interfere with marker dragging
-			if (e.target.classList.contains('leaflet-marker-icon')) {
-				return;
-			}
-
-			isDragging.current = false;
-			dragStart.current = { x: e.clientX, y: e.clientY };
-			mapStartCenter.current = map.getCenter();
-			// Don't change cursor yet - wait until we start dragging
-			e.preventDefault();
-		};
-
-		const handleMouseMove = e => {
-			if (!dragStart.current) return;
-
-			const dx = e.clientX - dragStart.current.x;
-			const dy = e.clientY - dragStart.current.y;
-
-			// If moved more than 3 pixels, it's a drag
-			if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-				// First time we detect dragging, change cursor to grab, then grabbing
-				if (!isDragging.current) {
-					container.style.cursor = 'grab';
-					// Use setTimeout to quickly transition to grabbing
-					setTimeout(() => {
-						if (dragStart.current) {
-							// Still dragging
-							container.style.cursor = 'grabbing';
-						}
-					}, 50);
-				}
-
-				isDragging.current = true;
-
-				// Calculate new center based on pixel movement
-				const startPoint = map.project(mapStartCenter.current, map.getZoom());
-				const newPoint = L.point(startPoint.x - dx, startPoint.y - dy);
-				const newCenter = map.unproject(newPoint, map.getZoom());
-
-				map.setView(newCenter, map.getZoom(), { animate: false });
-			}
-		};
-
-		const handleMouseUp = e => {
-			const wasDragging = isDragging.current;
-
-			// Reset everything immediately
-			isDragging.current = false;
-			dragStart.current = null;
-			mapStartCenter.current = null;
-			container.style.cursor = 'crosshair'; // Back to crosshair
-
-			// If we didn't drag, place a marker
-			if (!wasDragging && e.target.classList.contains('leaflet-container')) {
-				const latlng = map.mouseEventToLatLng(e);
-				onMapClick(latlng);
-			}
-		};
-
-		const handleMouseLeave = () => {
-			// Clean up if mouse leaves the map
-			isDragging.current = false;
-			dragStart.current = null;
-			mapStartCenter.current = null;
-			container.style.cursor = 'crosshair'; // Back to crosshair
-		};
-
-		container.addEventListener('mousedown', handleMouseDown);
-		container.addEventListener('mousemove', handleMouseMove);
-		container.addEventListener('mouseup', handleMouseUp);
-		container.addEventListener('mouseleave', handleMouseLeave);
-
-		// Set initial cursor to crosshair
-		container.style.cursor = 'crosshair';
-
-		// Global mouse up to catch releases outside map
-		const globalMouseUp = () => {
-			isDragging.current = false;
-			dragStart.current = null;
-			mapStartCenter.current = null;
-			container.style.cursor = 'crosshair'; // Back to crosshair
-		};
-
-		document.addEventListener('mouseup', globalMouseUp);
-
-		return () => {
-			container.removeEventListener('mousedown', handleMouseDown);
-			container.removeEventListener('mousemove', handleMouseMove);
-			container.removeEventListener('mouseup', handleMouseUp);
-			container.removeEventListener('mouseleave', handleMouseLeave);
-			document.removeEventListener('mouseup', globalMouseUp);
-			map.off('zoomend', handleZoomEnd);
-
-			// Re-enable Leaflet dragging on cleanup
-			if (map.dragging) {
-				map.dragging.enable();
-			}
-		};
-	}, [map, onMapClick, onZoomChange]);
-
-	return null;
-});
-
-const DraggableMarker = memo(function DraggableMarker({ position, onDragEnd, label }) {
-	const [markerRef, setMarkerRef] = useState(null);
-
-	const eventHandlers = useMemo(
-		() => ({
-			dragend() {
-				const marker = markerRef;
-				if (marker != null) {
-					const newPos = marker.getLatLng();
-					onDragEnd(newPos);
-				}
-			},
-		}),
-		[markerRef, onDragEnd]
-	);
-
-	return (
-		<Marker draggable={true} eventHandlers={eventHandlers} position={position} ref={setMarkerRef}>
-			<Popup>{label || `Lat: ${position.lat.toFixed(5)}, Lon: ${position.lng.toFixed(5)}`}</Popup>
-		</Marker>
-	);
-});
-
-// Component to sync zoom from sidebar to map
-const ZoomSync = memo(function ZoomSync({ zoom }) {
-	const map = useMap();
-
-	useEffect(() => {
-		if (!map) return;
-
-		// Wait for map to be fully ready before setting zoom
-		map.whenReady(() => {
-			if (map.getZoom() !== zoom) {
-				map.setZoom(zoom, { animate: false });
-			}
-		});
-	}, [map, zoom]);
-
-	return null;
-});
-
-// Component to sync map center and zoom when coordinates change
-const MapViewSync = memo(function MapViewSync({ center, zoom }) {
-	const map = useMap();
-
-	useEffect(() => {
-		if (!map) return;
-
-		// Wait for map to be fully ready before updating view
-		map.whenReady(() => {
-			const currentCenter = map.getCenter();
-			const currentZoom = map.getZoom();
-
-			// Check if center or zoom has changed
-			const centerChanged =
-				Math.abs(currentCenter.lat - center[0]) > 0.0001 || Math.abs(currentCenter.lng - center[1]) > 0.0001;
-			const zoomChanged = currentZoom !== zoom;
-
-			// Use setView to update both center and zoom efficiently
-			if (centerChanged || zoomChanged) {
-				map.setView(center, zoom, { animate: true });
-			}
-		});
-	}, [map, center, zoom]);
-
-	return null;
-});
-
-// Component to handle map loading state
-const MapLoadingHandler = memo(function MapLoadingHandler({ onMapReady }) {
-	const map = useMap();
-
-	useEffect(() => {
-		if (!map) return;
-
-		// Notify parent when map is ready
-		map.whenReady(() => {
-			// Small delay to ensure tiles start loading
-			setTimeout(() => {
-				if (onMapReady) {
-					onMapReady();
-				}
-			}, 100);
-		});
-	}, [map, onMapReady]);
-
-	return null;
-});
-
-// Fullscreen control component
-const FullscreenControl = memo(function FullscreenControl() {
-	const map = useMap();
-	const [isFullscreen, setIsFullscreen] = useState(false);
-
-	useEffect(() => {
-		if (!map) return;
-
-		const container = map.getContainer();
-		const fullscreenButton = L.control({ position: 'topright' });
-
-		fullscreenButton.onAdd = function () {
-			const button = L.DomUtil.create('button', 'leaflet-bar leaflet-control leaflet-control-custom');
-			button.innerHTML = '⛶';
-			button.title = 'Toggle Fullscreen';
-			button.style.backgroundColor = 'white';
-			button.style.width = '30px';
-			button.style.height = '30px';
-			button.style.fontSize = '20px';
-			button.style.cursor = 'pointer';
-			button.style.border = '2px solid rgba(0,0,0,0.2)';
-			button.style.borderRadius = '4px';
-
-			// Accessibility attributes
-			button.setAttribute('aria-label', 'Toggle fullscreen map view');
-			button.setAttribute('role', 'button');
-			button.setAttribute('type', 'button');
-			button.setAttribute('aria-pressed', 'false');
-
-			L.DomEvent.disableClickPropagation(button);
-			L.DomEvent.on(button, 'click', function (e) {
-				e.preventDefault();
-				e.stopPropagation();
-
-				const mapWrapper = container.closest('.newopm-map-container');
-				if (!mapWrapper) return;
-
-				if (!isFullscreen) {
-					// Enter fullscreen
-					if (mapWrapper.requestFullscreen) {
-						mapWrapper.requestFullscreen();
-					} else if (mapWrapper.mozRequestFullScreen) {
-						mapWrapper.mozRequestFullScreen();
-					} else if (mapWrapper.webkitRequestFullscreen) {
-						mapWrapper.webkitRequestFullscreen();
-					} else if (mapWrapper.msRequestFullscreen) {
-						mapWrapper.msRequestFullscreen();
-					}
-				} else {
-					// Exit fullscreen
-					if (document.exitFullscreen) {
-						document.exitFullscreen();
-					} else if (document.mozCancelFullScreen) {
-						document.mozCancelFullScreen();
-					} else if (document.webkitExitFullscreen) {
-						document.webkitExitFullscreen();
-					} else if (document.msExitFullscreen) {
-						document.msExitFullscreen();
-					}
-				}
-			});
-
-			return button;
-		};
-
-		fullscreenButton.addTo(map);
-
-		// Listen for fullscreen changes
-		const handleFullscreenChange = () => {
-			const isNowFullscreen = !!(
-				document.fullscreenElement ||
-				document.mozFullScreenElement ||
-				document.webkitFullscreenElement ||
-				document.msFullscreenElement
-			);
-			setIsFullscreen(isNowFullscreen);
-
-			// Update ARIA attribute
-			const fullscreenBtn = container.querySelector('.leaflet-control-custom');
-			if (fullscreenBtn) {
-				fullscreenBtn.setAttribute('aria-pressed', isNowFullscreen ? 'true' : 'false');
-				fullscreenBtn.setAttribute(
-					'aria-label',
-					isNowFullscreen ? 'Exit fullscreen map view' : 'Toggle fullscreen map view'
-				);
-			}
-
-			// Invalidate map size when entering/exiting fullscreen
-			setTimeout(() => {
-				map.invalidateSize();
-			}, 100);
-		};
-
-		document.addEventListener('fullscreenchange', handleFullscreenChange);
-		document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-		document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-		document.addEventListener('msfullscreenchange', handleFullscreenChange);
-
-		return () => {
-			fullscreenButton.remove();
-			document.removeEventListener('fullscreenchange', handleFullscreenChange);
-			document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-			document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-			document.removeEventListener('msfullscreenchange', handleFullscreenChange);
-		};
-	}, [map, isFullscreen]);
-
-	return null;
-});
-
-const SIZE_PRESETS = {
-	small: { width: '300px', height: 200 },
-	medium: { width: '100%', height: 400 },
-	large: { width: '100%', height: 600 },
-	fullscreen: { width: '100%', height: 800 },
-	custom: null,
-};
-
 export default function Edit({ attributes, setAttributes }) {
 	const { latitude, longitude, zoom, markerLat, markerLon, markerLabel, height, width, sizePreset } = attributes;
 	const [searchQuery, setSearchQuery] = useState('');
@@ -1058,83 +594,39 @@ export default function Edit({ attributes, setAttributes }) {
 			</InspectorControls>
 
 			<div {...blockProps}>
-				<MapErrorBoundary>
-					<div
-						className='newopm-map-container'
-						style={{ height: height + 'px' }}
-						role='application'
-						aria-label='Interactive map editor for OpenStreetMap'
-					>
-						<MapContainer
-							center={center}
-							zoom={zoom}
-							style={{ height: '100%', width: '100%' }}
-							scrollWheelZoom={true}
-							dragging={true}
-							touchZoom={true}
-							doubleClickZoom={true}
-							boxZoom={true}
-							keyboard={true}
-							trackResize={true}
+				<Suspense
+					fallback={
+						<div
+							style={{
+								height: height + 'px',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								backgroundColor: '#f0f0f0',
+							}}
 						>
-							<TileLayer
-								attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-								url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-								maxZoom={19}
-								updateWhenIdle={true}
-								updateWhenZooming={false}
-								keepBuffer={2}
-								maxNativeZoom={19}
-								minZoom={2}
-							/>
-							<MapLoadingHandler onMapReady={handleMapReady} />
-							<MapViewSync center={center} zoom={zoom} />
-							<FullscreenControl />
-							<MapInteractionHandler onMapClick={handleMapClick} onZoomChange={handleZoomChange} />
-							{markerPosition && (
-								<DraggableMarker position={markerPosition} onDragEnd={handleMarkerDrag} label={markerLabel} />
-							)}
-						</MapContainer>
-						{isMapLoading && (
-							<div
-								style={{
-									position: 'absolute',
-									top: 0,
-									left: 0,
-									right: 0,
-									bottom: 0,
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center',
-									backgroundColor: 'rgba(255, 255, 255, 0.9)',
-									zIndex: 1000,
-								}}
-								role='status'
-								aria-live='polite'
-								aria-label='Map is loading'
-							>
-								<div style={{ textAlign: 'center' }}>
-									<div
-										className='newopm-spinner'
-										style={{
-											width: '40px',
-											height: '40px',
-											border: '4px solid #f3f3f3',
-											borderTop: '4px solid #2271b1',
-											borderRadius: '50%',
-											margin: '0 auto 12px',
-										}}
-										role='img'
-										aria-label='Loading spinner'
-									/>
-									<p style={{ margin: 0, color: '#2271b1', fontSize: '14px', fontWeight: '500' }}>
-										{__('Loading map...', 'newopm')}
-									</p>
-								</div>
+							<div style={{ textAlign: 'center' }}>
+								<Spinner />
+								<p style={{ marginTop: '16px', color: '#666' }}>
+									{__('Loading map editor...', 'newopm')}
+								</p>
 							</div>
-						)}
-					</div>
-				</MapErrorBoundary>
+						</div>
+					}
+				>
+					<MapEditor
+						center={center}
+						zoom={zoom}
+						markerPosition={markerPosition}
+						markerLabel={markerLabel}
+						height={height}
+						isMapLoading={isMapLoading}
+						onMapClick={handleMapClick}
+						onZoomChange={handleZoomChange}
+						onMarkerDrag={handleMarkerDrag}
+						onMapReady={handleMapReady}
+					/>
+				</Suspense>
 			</div>
 		</>
 	);
