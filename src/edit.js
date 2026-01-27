@@ -300,7 +300,7 @@ export default function Edit({ attributes, setAttributes }) {
 		},
 	});
 
-	const handleSearch = async () => {
+	const handleSearch = useCallback(async () => {
 		if (!searchQuery.trim()) return;
 
 		setIsSearching(true);
@@ -347,7 +347,7 @@ export default function Edit({ attributes, setAttributes }) {
 		} finally {
 			setIsSearching(false);
 		}
-	};
+	}, [searchQuery, setAttributes, setMarkerAddress, setIsSearching]);
 
 	// Debounced reverse geocoding to prevent rapid API calls during marker dragging
 	const reverseGeocodeTimeout = useRef(null);
@@ -409,13 +409,19 @@ export default function Edit({ attributes, setAttributes }) {
 		};
 	}, []);
 
-	const handleMapClick = latlng => {
-		fetchAddress(latlng.lat, latlng.lng);
-	};
+	const handleMapClick = useCallback(
+		latlng => {
+			fetchAddress(latlng.lat, latlng.lng);
+		},
+		[fetchAddress]
+	);
 
-	const handleMarkerDrag = latlng => {
-		fetchAddress(latlng.lat, latlng.lng);
-	};
+	const handleMarkerDrag = useCallback(
+		latlng => {
+			fetchAddress(latlng.lat, latlng.lng);
+		},
+		[fetchAddress]
+	);
 
 	// Debounce zoom changes to reduce attribute updates during zoom animation
 	const zoomTimeoutRef = useRef(null);
@@ -431,30 +437,33 @@ export default function Edit({ attributes, setAttributes }) {
 		[setAttributes]
 	);
 
-	const clearMarker = () => {
+	const clearMarker = useCallback(() => {
 		setAttributes({
 			markerLat: undefined,
 			markerLon: undefined,
 			markerLabel: '',
 		});
-	};
+	}, [setAttributes]);
 
-	const handleSizePresetChange = preset => {
-		setAttributes({ sizePreset: preset });
+	const handleSizePresetChange = useCallback(
+		preset => {
+			setAttributes({ sizePreset: preset });
 
-		if (preset !== 'custom' && SIZE_PRESETS[preset]) {
-			setAttributes({
-				width: SIZE_PRESETS[preset].width,
-				height: SIZE_PRESETS[preset].height,
-				sizePreset: preset,
-			});
-			setUseCustomSize(false);
-		} else {
-			setUseCustomSize(true);
-		}
-	};
+			if (preset !== 'custom' && SIZE_PRESETS[preset]) {
+				setAttributes({
+					width: SIZE_PRESETS[preset].width,
+					height: SIZE_PRESETS[preset].height,
+					sizePreset: preset,
+				});
+				setUseCustomSize(false);
+			} else {
+				setUseCustomSize(true);
+			}
+		},
+		[setAttributes, setUseCustomSize]
+	);
 
-	const saveAsDefault = async () => {
+	const saveAsDefault = useCallback(async () => {
 		try {
 			const data = await apiFetch({
 				path: '/newopm/v1/defaults',
@@ -503,7 +512,7 @@ export default function Edit({ attributes, setAttributes }) {
 				}
 			);
 		}
-	};
+	}, [sizePreset, height, width, zoom, latitude, longitude, markerLat, markerLon, markerLabel]);
 
 	// Memoize expensive calculations to prevent unnecessary re-renders
 	const center = useMemo(() => [latitude, longitude], [latitude, longitude]);
