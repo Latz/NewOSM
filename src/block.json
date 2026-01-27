@@ -8,7 +8,7 @@
 	"description": "Display an interactive OpenStreetMap with location search and marker placement.",
 	"keywords": ["map", "openstreetmap", "osm", "location", "marker"],
 	"version": "1.0.0",
-	"textdomain": "new-osm",
+	"textdomain": "newopm",
 	"attributes": {
 		"latitude": {
 			"type": "number",
@@ -54,6 +54,5 @@
 	},
 	"editorScript": "file:./index.js",
 	"editorStyle": "file:./index.css",
-	"style": "file:./style-index.css",
-	"viewScript": "file:./view.js"
+	"style": "file:./style-index.css"
 }

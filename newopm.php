@@ -8,12 +8,17 @@
  * Author:            Your Name
  * License:           GPL v2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain:       new-osm
+ * Text Domain:       newopm
  * Domain Path:       /languages
  */
 
 if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly
+}
+
+// Force HTTPS for plugin URLs if site is accessed via HTTPS
+if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+    $_SERVER['HTTPS'] = 'on';
 }
 
 // Define plugin constants
@@ -32,9 +37,35 @@ define('NEWOPM_PLUGIN_BASENAME', plugin_basename(__FILE__));
  * @return void
  */
 function newopm_load_textdomain() {
-    load_plugin_textdomain('new-osm', false, dirname(NEWOPM_PLUGIN_BASENAME) . '/languages');
+    load_plugin_textdomain('newopm', false, dirname(NEWOPM_PLUGIN_BASENAME) . '/languages');
 }
 add_action('init', 'newopm_load_textdomain');
+
+/**
+ * Filter block type metadata to ensure HTTPS URLs
+ *
+ * @since 1.0.0
+ * @param array $metadata Block metadata
+ * @return array Modified metadata
+ */
+function newopm_filter_block_metadata($metadata) {
+    // Force HTTPS in plugin URL if site uses HTTPS
+    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+        if (isset($metadata['editorScript']) && is_string($metadata['editorScript'])) {
+            $metadata['editorScript'] = str_replace('http://', 'https://', $metadata['editorScript']);
+        }
+        if (isset($metadata['editorStyle']) && is_string($metadata['editorStyle'])) {
+            $metadata['editorStyle'] = str_replace('http://', 'https://', $metadata['editorStyle']);
+        }
+        if (isset($metadata['style']) && is_string($metadata['style'])) {
+            $metadata['style'] = str_replace('http://', 'https://', $metadata['style']);
+        }
+        if (isset($metadata['viewScript']) && is_string($metadata['viewScript'])) {
+            $metadata['viewScript'] = str_replace('http://', 'https://', $metadata['viewScript']);
+        }
+    }
+    return $metadata;
+}
 
 /**
  * Register the OpenStreetMap block
@@ -46,7 +77,58 @@ add_action('init', 'newopm_load_textdomain');
  * @return void
  */
 function newopm_register_block() {
-    register_block_type(NEWOPM_PLUGIN_DIR . 'build');
+    error_log('NewOSM: newopm_register_block() called');
+    error_log('NewOSM: Build dir: ' . NEWOPM_PLUGIN_DIR . 'build');
+    error_log('NewOSM: Build dir exists: ' . (file_exists(NEWOPM_PLUGIN_DIR . 'build') ? 'yes' : 'no'));
+    error_log('NewOSM: block.json exists: ' . (file_exists(NEWOPM_PLUGIN_DIR . 'build/block.json') ? 'yes' : 'no'));
+
+    $metadata = register_block_type(NEWOPM_PLUGIN_DIR . 'build');
+
+    if ($metadata) {
+        error_log('NewOSM: Block registered successfully - ' . $metadata->name);
+        error_log('NewOSM: Editor script: ' . print_r($metadata->editor_script, true));
+        error_log('NewOSM: Editor style: ' . print_r($metadata->editor_style, true));
+    } else {
+        error_log('NewOSM: Block registration FAILED');
+    }
+
+    // Log registered scripts
+    global $wp_scripts;
+    if ($wp_scripts) {
+        error_log('NewOSM: Checking registered scripts...');
+        foreach ($wp_scripts->registered as $handle => $script) {
+            if (strpos($handle, 'newopm') !== false || strpos($handle, 'osm-map') !== false) {
+                error_log('NewOSM: Found script - Handle: ' . $handle . ' | Src: ' . $script->src);
+            }
+        }
+    }
+
+    // Force HTTPS for script URLs if needed
+    if ($metadata && !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+        global $wp_scripts, $wp_styles;
+
+        // Update editor script URL to HTTPS
+        if (isset($wp_scripts->registered['newopm-osm-map-editor-script'])) {
+            $wp_scripts->registered['newopm-osm-map-editor-script']->src =
+                str_replace('http://', 'https://', $wp_scripts->registered['newopm-osm-map-editor-script']->src);
+        }
+
+        // Update view script URL to HTTPS
+        if (isset($wp_scripts->registered['newopm-osm-map-view-script'])) {
+            $wp_scripts->registered['newopm-osm-map-view-script']->src =
+                str_replace('http://', 'https://', $wp_scripts->registered['newopm-osm-map-view-script']->src);
+        }
+
+        // Update style URLs to HTTPS
+        if (isset($wp_styles->registered['newopm-osm-map-editor-style'])) {
+            $wp_styles->registered['newopm-osm-map-editor-style']->src =
+                str_replace('http://', 'https://', $wp_styles->registered['newopm-osm-map-editor-style']->src);
+        }
+        if (isset($wp_styles->registered['newopm-osm-map-style'])) {
+            $wp_styles->registered['newopm-osm-map-style']->src =
+                str_replace('http://', 'https://', $wp_styles->registered['newopm-osm-map-style']->src);
+        }
+    }
 }
 add_action('init', 'newopm_register_block');
 
@@ -60,12 +142,24 @@ add_action('init', 'newopm_register_block');
  * @return void
  */
 function newopm_localize_editor_script() {
+    error_log('NewOSM: newopm_localize_editor_script() called');
+
     // Get the editor script handle from the asset file
     $asset_file = include(NEWOPM_PLUGIN_DIR . 'build/index.asset.php');
 
     // The script handle is generated by WordPress scripts as 'newopm-osm-map-editor-script'
     // based on the block name in block.json
     $script_handle = 'newopm-osm-map-editor-script';
+
+    error_log('NewOSM: Looking for script handle: ' . $script_handle);
+    error_log('NewOSM: Script is registered: ' . (wp_script_is($script_handle, 'registered') ? 'yes' : 'no'));
+    error_log('NewOSM: Script is enqueued: ' . (wp_script_is($script_handle, 'enqueued') ? 'yes' : 'no'));
+
+    // Try to manually enqueue if not enqueued
+    if (!wp_script_is($script_handle, 'enqueued') && wp_script_is($script_handle, 'registered')) {
+        wp_enqueue_script($script_handle);
+        error_log('NewOSM: Manually enqueued script');
+    }
 
     // Check if the script is registered before localizing
     if (wp_script_is($script_handle, 'registered')) {
@@ -78,9 +172,35 @@ function newopm_localize_editor_script() {
                 'version' => NEWOPM_VERSION,
             )
         );
+        error_log('NewOSM: Script localized successfully');
+    } else {
+        error_log('NewOSM: Script NOT registered, cannot localize');
     }
 }
 add_action('enqueue_block_editor_assets', 'newopm_localize_editor_script', 20);
+
+/**
+ * Debug: Check what scripts are actually enqueued
+ */
+function newopm_debug_enqueued_scripts() {
+    if (!is_admin()) {
+        return;
+    }
+
+    error_log('NewOSM: Checking enqueued scripts in wp_footer/admin_print_footer_scripts');
+    global $wp_scripts;
+    if ($wp_scripts) {
+        foreach ($wp_scripts->queue as $handle) {
+            if (strpos($handle, 'newopm') !== false) {
+                error_log('NewOSM: Script in queue: ' . $handle);
+                if (isset($wp_scripts->registered[$handle])) {
+                    error_log('NewOSM: Script URL: ' . $wp_scripts->registered[$handle]->src);
+                }
+            }
+        }
+    }
+}
+add_action('admin_print_footer_scripts', 'newopm_debug_enqueued_scripts', 999);
 
 /**
  * Enqueue Leaflet assets for frontend
@@ -156,12 +276,26 @@ add_action('wp_enqueue_scripts', 'newopm_localize_frontend_script', 20);
  * @return void
  */
 function newopm_enqueue_editor_assets() {
+    error_log('NewOSM: newopm_enqueue_editor_assets() called on screen: ' . get_current_screen()->id);
+
+    // Enqueue Leaflet CSS
     wp_enqueue_style(
         'leaflet-editor-css',
         'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
         array(),
         '1.9.4'
     );
+
+    // Manually enqueue Leaflet JS for the editor
+    wp_enqueue_script(
+        'leaflet-js',
+        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+        array(),
+        '1.9.4',
+        true
+    );
+
+    error_log('NewOSM: Leaflet assets enqueued');
 }
 add_action('enqueue_block_editor_assets', 'newopm_enqueue_editor_assets');
 
@@ -177,8 +311,8 @@ add_action('enqueue_block_editor_assets', 'newopm_enqueue_editor_assets');
  */
 function newopm_add_settings_page() {
     add_options_page(
-        __('NewOSM Settings', 'new-osm'),
-        __('NewOSM', 'new-osm'),
+        __('NewOSM Settings', 'newopm'),
+        __('NewOSM', 'newopm'),
         'manage_options',
         'newopm-settings',
         'newopm_render_settings_page'
@@ -263,7 +397,7 @@ function newopm_render_settings_page() {
         add_settings_error(
             'newopm_messages',
             'newopm_message',
-            __('Settings Saved', 'new-osm'),
+            __('Settings Saved', 'newopm'),
             'updated'
         );
     }
@@ -275,122 +409,122 @@ function newopm_render_settings_page() {
         <form action="options.php" method="post">
             <?php settings_fields('newopm_settings'); ?>
 
-            <h2><?php esc_html_e('Map Size Settings', 'new-osm'); ?></h2>
+            <h2><?php esc_html_e('Map Size Settings', 'newopm'); ?></h2>
             <table class="form-table">
                 <tr>
                     <th scope="row">
-                        <label for="newopm_default_size_preset"><?php esc_html_e('Default Size Preset', 'new-osm'); ?></label>
+                        <label for="newopm_default_size_preset"><?php esc_html_e('Default Size Preset', 'newopm'); ?></label>
                     </th>
                     <td>
                         <select id="newopm_default_size_preset" name="newopm_default_size_preset">
-                            <option value="small" <?php selected(get_option('newopm_default_size_preset', 'medium'), 'small'); ?>><?php esc_html_e('Small (300×200)', 'new-osm'); ?></option>
-                            <option value="medium" <?php selected(get_option('newopm_default_size_preset', 'medium'), 'medium'); ?>><?php esc_html_e('Medium (100%×400)', 'new-osm'); ?></option>
-                            <option value="large" <?php selected(get_option('newopm_default_size_preset', 'medium'), 'large'); ?>><?php esc_html_e('Large (100%×600)', 'new-osm'); ?></option>
-                            <option value="fullscreen" <?php selected(get_option('newopm_default_size_preset', 'medium'), 'fullscreen'); ?>><?php esc_html_e('Fullscreen (100%×800)', 'new-osm'); ?></option>
-                            <option value="custom" <?php selected(get_option('newopm_default_size_preset', 'medium'), 'custom'); ?>><?php esc_html_e('Custom', 'new-osm'); ?></option>
+                            <option value="small" <?php selected(get_option('newopm_default_size_preset', 'medium'), 'small'); ?>><?php esc_html_e('Small (300×200)', 'newopm'); ?></option>
+                            <option value="medium" <?php selected(get_option('newopm_default_size_preset', 'medium'), 'medium'); ?>><?php esc_html_e('Medium (100%×400)', 'newopm'); ?></option>
+                            <option value="large" <?php selected(get_option('newopm_default_size_preset', 'medium'), 'large'); ?>><?php esc_html_e('Large (100%×600)', 'newopm'); ?></option>
+                            <option value="fullscreen" <?php selected(get_option('newopm_default_size_preset', 'medium'), 'fullscreen'); ?>><?php esc_html_e('Fullscreen (100%×800)', 'newopm'); ?></option>
+                            <option value="custom" <?php selected(get_option('newopm_default_size_preset', 'medium'), 'custom'); ?>><?php esc_html_e('Custom', 'newopm'); ?></option>
                         </select>
-                        <p class="description"><?php esc_html_e('Select a preset size for new maps', 'new-osm'); ?></p>
+                        <p class="description"><?php esc_html_e('Select a preset size for new maps', 'newopm'); ?></p>
                     </td>
                 </tr>
                 <tr>
                     <th scope="row">
-                        <label for="newopm_default_height"><?php esc_html_e('Default Height (px)', 'new-osm'); ?></label>
+                        <label for="newopm_default_height"><?php esc_html_e('Default Height (px)', 'newopm'); ?></label>
                     </th>
                     <td>
                         <input type="number" id="newopm_default_height" name="newopm_default_height"
                                value="<?php echo esc_attr(get_option('newopm_default_height', 400)); ?>"
                                min="200" max="1200" step="10" class="small-text">
-                        <p class="description"><?php esc_html_e('Height in pixels (used when preset is "Custom")', 'new-osm'); ?></p>
+                        <p class="description"><?php esc_html_e('Height in pixels (used when preset is "Custom")', 'newopm'); ?></p>
                     </td>
                 </tr>
                 <tr>
                     <th scope="row">
-                        <label for="newopm_default_width"><?php esc_html_e('Default Width', 'new-osm'); ?></label>
+                        <label for="newopm_default_width"><?php esc_html_e('Default Width', 'newopm'); ?></label>
                     </th>
                     <td>
                         <input type="text" id="newopm_default_width" name="newopm_default_width"
                                value="<?php echo esc_attr(get_option('newopm_default_width', '100%')); ?>"
                                class="regular-text">
-                        <p class="description"><?php esc_html_e('Width (e.g., 100%, 800px, 50vw)', 'new-osm'); ?></p>
+                        <p class="description"><?php esc_html_e('Width (e.g., 100%, 800px, 50vw)', 'newopm'); ?></p>
                     </td>
                 </tr>
             </table>
 
-            <h2><?php esc_html_e('Map Position Settings', 'new-osm'); ?></h2>
+            <h2><?php esc_html_e('Map Position Settings', 'newopm'); ?></h2>
             <table class="form-table">
                 <tr>
                     <th scope="row">
-                        <label for="newopm_default_latitude"><?php esc_html_e('Default Latitude', 'new-osm'); ?></label>
+                        <label for="newopm_default_latitude"><?php esc_html_e('Default Latitude', 'newopm'); ?></label>
                     </th>
                     <td>
                         <input type="number" id="newopm_default_latitude" name="newopm_default_latitude"
                                value="<?php echo esc_attr(get_option('newopm_default_latitude', 51.505)); ?>"
                                min="-90" max="90" step="0.000001" class="regular-text">
-                        <p class="description"><?php esc_html_e('Default map center latitude (-90 to 90)', 'new-osm'); ?></p>
+                        <p class="description"><?php esc_html_e('Default map center latitude (-90 to 90)', 'newopm'); ?></p>
                     </td>
                 </tr>
                 <tr>
                     <th scope="row">
-                        <label for="newopm_default_longitude"><?php esc_html_e('Default Longitude', 'new-osm'); ?></label>
+                        <label for="newopm_default_longitude"><?php esc_html_e('Default Longitude', 'newopm'); ?></label>
                     </th>
                     <td>
                         <input type="number" id="newopm_default_longitude" name="newopm_default_longitude"
                                value="<?php echo esc_attr(get_option('newopm_default_longitude', -0.09)); ?>"
                                min="-180" max="180" step="0.000001" class="regular-text">
-                        <p class="description"><?php esc_html_e('Default map center longitude (-180 to 180)', 'new-osm'); ?></p>
+                        <p class="description"><?php esc_html_e('Default map center longitude (-180 to 180)', 'newopm'); ?></p>
                     </td>
                 </tr>
                 <tr>
                     <th scope="row">
-                        <label for="newopm_default_zoom"><?php esc_html_e('Default Zoom Level', 'new-osm'); ?></label>
+                        <label for="newopm_default_zoom"><?php esc_html_e('Default Zoom Level', 'newopm'); ?></label>
                     </th>
                     <td>
                         <input type="number" id="newopm_default_zoom" name="newopm_default_zoom"
                                value="<?php echo esc_attr(get_option('newopm_default_zoom', 13)); ?>"
                                min="1" max="18" step="1" class="small-text">
-                        <p class="description"><?php esc_html_e('Zoom level (1-18)', 'new-osm'); ?></p>
+                        <p class="description"><?php esc_html_e('Zoom level (1-18)', 'newopm'); ?></p>
                     </td>
                 </tr>
             </table>
 
-            <h2><?php esc_html_e('Default Marker Settings', 'new-osm'); ?></h2>
+            <h2><?php esc_html_e('Default Marker Settings', 'newopm'); ?></h2>
             <table class="form-table">
                 <tr>
                     <th scope="row">
-                        <label for="newopm_default_marker_lat"><?php esc_html_e('Default Marker Latitude', 'new-osm'); ?></label>
+                        <label for="newopm_default_marker_lat"><?php esc_html_e('Default Marker Latitude', 'newopm'); ?></label>
                     </th>
                     <td>
                         <input type="number" id="newopm_default_marker_lat" name="newopm_default_marker_lat"
                                value="<?php echo esc_attr(get_option('newopm_default_marker_lat', '')); ?>"
                                min="-90" max="90" step="0.000001" class="regular-text">
-                        <p class="description"><?php esc_html_e('Default marker latitude (leave empty for no marker)', 'new-osm'); ?></p>
+                        <p class="description"><?php esc_html_e('Default marker latitude (leave empty for no marker)', 'newopm'); ?></p>
                     </td>
                 </tr>
                 <tr>
                     <th scope="row">
-                        <label for="newopm_default_marker_lon"><?php esc_html_e('Default Marker Longitude', 'new-osm'); ?></label>
+                        <label for="newopm_default_marker_lon"><?php esc_html_e('Default Marker Longitude', 'newopm'); ?></label>
                     </th>
                     <td>
                         <input type="number" id="newopm_default_marker_lon" name="newopm_default_marker_lon"
                                value="<?php echo esc_attr(get_option('newopm_default_marker_lon', '')); ?>"
                                min="-180" max="180" step="0.000001" class="regular-text">
-                        <p class="description"><?php esc_html_e('Default marker longitude (leave empty for no marker)', 'new-osm'); ?></p>
+                        <p class="description"><?php esc_html_e('Default marker longitude (leave empty for no marker)', 'newopm'); ?></p>
                     </td>
                 </tr>
                 <tr>
                     <th scope="row">
-                        <label for="newopm_default_marker_label"><?php esc_html_e('Default Marker Label', 'new-osm'); ?></label>
+                        <label for="newopm_default_marker_label"><?php esc_html_e('Default Marker Label', 'newopm'); ?></label>
                     </th>
                     <td>
                         <input type="text" id="newopm_default_marker_label" name="newopm_default_marker_label"
                                value="<?php echo esc_attr(get_option('newopm_default_marker_label', '')); ?>"
                                class="regular-text">
-                        <p class="description"><?php esc_html_e('Default text for marker popup', 'new-osm'); ?></p>
+                        <p class="description"><?php esc_html_e('Default text for marker popup', 'newopm'); ?></p>
                     </td>
                 </tr>
             </table>
 
-            <?php submit_button(__('Save Settings', 'new-osm')); ?>
+            <?php submit_button(__('Save Settings', 'newopm')); ?>
         </form>
     </div>
     <?php
@@ -576,7 +710,7 @@ function newopm_rest_get_defaults() {
     } catch (Exception $e) {
         return new WP_Error(
             'newopm_get_defaults_error',
-            __('Failed to retrieve default settings', 'new-osm'),
+            __('Failed to retrieve default settings', 'newopm'),
             array('status' => 500)
         );
     }
@@ -618,7 +752,7 @@ function newopm_rest_save_defaults($request) {
             if ($result === false && get_option($option_name) !== $option_value) {
                 throw new Exception(sprintf(
                     /* translators: %s: option name */
-                    __('Failed to update option: %s', 'new-osm'),
+                    __('Failed to update option: %s', 'newopm'),
                     $option_name
                 ));
             }
@@ -626,7 +760,7 @@ function newopm_rest_save_defaults($request) {
 
         return rest_ensure_response(array(
             'success' => true,
-            'message' => __('Settings saved successfully', 'new-osm')
+            'message' => __('Settings saved successfully', 'newopm')
         ));
     } catch (Exception $e) {
         return new WP_Error(

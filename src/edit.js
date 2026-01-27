@@ -57,20 +57,20 @@ class MapErrorBoundary extends Component {
 						color: '#444',
 					}}
 				>
-					<h3 style={{ margin: '0 0 12px 0', color: '#dc3232' }}>{__('Map Failed to Load', 'new-osm')}</h3>
+					<h3 style={{ margin: '0 0 12px 0', color: '#dc3232' }}>{__('Map Failed to Load', 'newopm')}</h3>
 					<p style={{ margin: '0 0 12px 0' }}>
-						{__('The map component encountered an error and could not be displayed. This may be due to:', 'new-osm')}
+						{__('The map component encountered an error and could not be displayed. This may be due to:', 'newopm')}
 					</p>
 					<ul style={{ margin: '0 0 16px 20px' }}>
-						<li>{__('Network connectivity issues', 'new-osm')}</li>
-						<li>{__('Leaflet library failed to load', 'new-osm')}</li>
-						<li>{__('Invalid map configuration', 'new-osm')}</li>
-						<li>{__('Browser compatibility issues', 'new-osm')}</li>
+						<li>{__('Network connectivity issues', 'newopm')}</li>
+						<li>{__('Leaflet library failed to load', 'newopm')}</li>
+						<li>{__('Invalid map configuration', 'newopm')}</li>
+						<li>{__('Browser compatibility issues', 'newopm')}</li>
 					</ul>
 					{this.state.error && (
 						<details style={{ marginBottom: '16px' }}>
 							<summary style={{ cursor: 'pointer', fontWeight: 'bold', marginBottom: '8px' }}>
-								{__('Error Details (for debugging)', 'new-osm')}
+								{__('Error Details (for debugging)', 'newopm')}
 							</summary>
 							<pre
 								style={{
@@ -99,7 +99,7 @@ class MapErrorBoundary extends Component {
 								cursor: 'pointer',
 							}}
 						>
-							{__('Try Again', 'new-osm')}
+							{__('Try Again', 'newopm')}
 						</button>
 						<button
 							onClick={() => window.location.reload()}
@@ -112,7 +112,7 @@ class MapErrorBoundary extends Component {
 								cursor: 'pointer',
 							}}
 						>
-							{__('Reload Page', 'new-osm')}
+							{__('Reload Page', 'newopm')}
 						</button>
 					</div>
 				</div>
@@ -700,7 +700,7 @@ export default function Edit({ attributes, setAttributes }) {
 			} else {
 				dispatch('core/notices').createNotice(
 					'warning',
-					__('Location not found. Please try a different search term.', 'new-osm'),
+					__('Location not found. Please try a different search term.', 'newopm'),
 					{
 						type: 'snackbar',
 						isDismissible: true,
@@ -712,7 +712,7 @@ export default function Edit({ attributes, setAttributes }) {
 			// Provide more specific error message
 			const errorMessage = error.message.includes('Rate limited')
 				? error.message
-				: __('Error searching for location. Please try again in a moment.', 'new-osm');
+				: __('Error searching for location. Please try again in a moment.', 'newopm');
 			dispatch('core/notices').createNotice(
 				'error',
 				errorMessage,
@@ -839,7 +839,7 @@ export default function Edit({ attributes, setAttributes }) {
 			if (data.success) {
 				dispatch('core/notices').createNotice(
 					'success',
-					data.message || __('Default settings saved successfully!', 'new-osm'),
+					data.message || __('Default settings saved successfully!', 'newopm'),
 					{
 						type: 'snackbar',
 						isDismissible: true,
@@ -848,7 +848,7 @@ export default function Edit({ attributes, setAttributes }) {
 			} else {
 				dispatch('core/notices').createNotice(
 					'warning',
-					__('Settings may not have been saved. Check console for details.', 'new-osm'),
+					__('Settings may not have been saved. Check console for details.', 'newopm'),
 					{
 						type: 'snackbar',
 						isDismissible: true,
@@ -860,7 +860,7 @@ export default function Edit({ attributes, setAttributes }) {
 			console.error('Error details:', error.message, error.data);
 			dispatch('core/notices').createNotice(
 				'error',
-				__('Error saving defaults: ', 'new-osm') + (error.message || __('Unknown error', 'new-osm')),
+				__('Error saving defaults: ', 'newopm') + (error.message || __('Unknown error', 'newopm')),
 				{
 					type: 'snackbar',
 					isDismissible: true,
@@ -1104,7 +1104,7 @@ export default function Edit({ attributes, setAttributes }) {
 										aria-label='Loading spinner'
 									/>
 									<p style={{ margin: 0, color: '#2271b1', fontSize: '14px', fontWeight: '500' }}>
-										{__('Loading map...', 'new-osm')}
+										{__('Loading map...', 'newopm')}
 									</p>
 								</div>
 							</div>

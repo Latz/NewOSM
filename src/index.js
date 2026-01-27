@@ -2,10 +2,13 @@ import { registerBlockType } from '@wordpress/blocks';
 import metadata from './block.json';
 import Edit from './edit';
 import save from './save';
-import './style.scss';
 import './editor.scss';
 
-registerBlockType(metadata.name, {
-    edit: Edit,
-    save,
+console.log('NewOSM: Attempting to register block', metadata.name);
+
+const registeredBlock = registerBlockType(metadata.name, {
+	edit: Edit,
+	save,
 });
+
+console.log('NewOSM: Block registration result', registeredBlock ? 'SUCCESS' : 'FAILED');

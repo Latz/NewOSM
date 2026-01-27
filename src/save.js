@@ -15,7 +15,7 @@ export default function save({ attributes }) {
 			<div {...blockProps}>
 				<div className='newopm-map-error' style={{ padding: '20px', border: '2px solid #dc3232', borderRadius: '4px', backgroundColor: '#fef7f7' }}>
 					<p style={{ margin: 0, color: '#dc3232' }}>
-						<strong>{__('Invalid map configuration:', 'new-osm')}</strong> {__('Please check the map coordinates and zoom level in the block settings.', 'new-osm')}
+						<strong>{__('Invalid map configuration:', 'newopm')}</strong> {__('Please check the map coordinates and zoom level in the block settings.', 'newopm')}
 					</p>
 				</div>
 			</div>
@@ -40,7 +40,7 @@ export default function save({ attributes }) {
 				style={{ height: height + 'px', width: width || '100%' }}
 			>
 				<noscript>
-					<p>{__('This map requires JavaScript to display.', 'new-osm')}</p>
+					<p>{__('This map requires JavaScript to display.', 'newopm')}</p>
 				</noscript>
 			</div>
 		</div>
