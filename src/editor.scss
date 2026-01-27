@@ -101,14 +101,19 @@ img.leaflet-tile {
     color: #333;
 }
 
-// Fullscreen button centering fix
+// Fullscreen button centering fix - need high specificity to override Leaflet defaults
+.leaflet-bar button.leaflet-control-custom,
+button.leaflet-bar.leaflet-control-custom,
 .leaflet-control-custom {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     padding: 0 !important;
+    margin: 0 !important;
     line-height: 1 !important;
     text-align: center !important;
+    text-indent: 0 !important;
+    vertical-align: middle !important;
 }
 
 // Fullscreen styles mixin
