@@ -9,7 +9,6 @@ import { Component, useEffect, useRef, useState, useMemo } from '@wordpress/elem
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { __ } from '@wordpress/i18n';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 
 /**
  * Error Boundary Component
@@ -48,7 +47,15 @@ class MapErrorBoundary extends Component {
 	render() {
 		if (this.state.hasError) {
 			return (
-				<div style={{ padding: '20px', border: '2px solid #dc3232', borderRadius: '4px', backgroundColor: '#fef7f7', color: '#444' }}>
+				<div
+					style={{
+						padding: '20px',
+						border: '2px solid #dc3232',
+						borderRadius: '4px',
+						backgroundColor: '#fef7f7',
+						color: '#444',
+					}}
+				>
 					<h3 style={{ margin: '0 0 12px 0', color: '#dc3232' }}>{__('Map Failed to Load', 'newopm')}</h3>
 					<p style={{ margin: '0 0 12px 0' }}>
 						{__('The map component encountered an error and could not be displayed. This may be due to:', 'newopm')}
@@ -64,7 +71,16 @@ class MapErrorBoundary extends Component {
 							<summary style={{ cursor: 'pointer', fontWeight: 'bold', marginBottom: '8px' }}>
 								{__('Error Details (for debugging)', 'newopm')}
 							</summary>
-							<pre style={{ backgroundColor: '#f5f5f5', padding: '10px', borderRadius: '4px', fontSize: '12px', overflow: 'auto', maxHeight: '200px' }}>
+							<pre
+								style={{
+									backgroundColor: '#f5f5f5',
+									padding: '10px',
+									borderRadius: '4px',
+									fontSize: '12px',
+									overflow: 'auto',
+									maxHeight: '200px',
+								}}
+							>
 								{this.state.error.toString()}
 								{this.state.errorInfo && this.state.errorInfo.componentStack}
 							</pre>
@@ -73,13 +89,27 @@ class MapErrorBoundary extends Component {
 					<div style={{ display: 'flex', gap: '8px' }}>
 						<button
 							onClick={this.handleReset}
-							style={{ padding: '8px 16px', backgroundColor: '#2271b1', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}
+							style={{
+								padding: '8px 16px',
+								backgroundColor: '#2271b1',
+								color: 'white',
+								border: 'none',
+								borderRadius: '3px',
+								cursor: 'pointer',
+							}}
 						>
 							{__('Try Again', 'newopm')}
 						</button>
 						<button
 							onClick={() => window.location.reload()}
-							style={{ padding: '8px 16px', backgroundColor: '#dcdcdc', color: '#2c3338', border: 'none', borderRadius: '3px', cursor: 'pointer' }}
+							style={{
+								padding: '8px 16px',
+								backgroundColor: '#dcdcdc',
+								color: '#2c3338',
+								border: 'none',
+								borderRadius: '3px',
+								cursor: 'pointer',
+							}}
 						>
 							{__('Reload Page', 'newopm')}
 						</button>
@@ -129,7 +159,7 @@ function MapInteractionHandler({ onMapClick, onZoomChange }) {
 		// Custom drag implementation
 		const mapContainer = map.getContainer();
 
-		const handleMouseDown = (e) => {
+		const handleMouseDown = e => {
 			// Don't initiate drag on marker
 			if (e.target.classList.contains('leaflet-marker-icon')) {
 				return;
@@ -141,7 +171,7 @@ function MapInteractionHandler({ onMapClick, onZoomChange }) {
 			e.preventDefault();
 		};
 
-		const handleMouseMove = (e) => {
+		const handleMouseMove = e => {
 			if (!dragStartRef.current) return;
 
 			const dx = e.clientX - dragStartRef.current.x;
@@ -166,7 +196,7 @@ function MapInteractionHandler({ onMapClick, onZoomChange }) {
 			}
 		};
 
-		const handleMouseUp = (e) => {
+		const handleMouseUp = e => {
 			const wasDragging = isDraggingRef.current;
 			isDraggingRef.current = false;
 			dragStartRef.current = null;
@@ -368,10 +398,7 @@ function FullscreenControl() {
 			const button = mapContainer.querySelector('.leaflet-control-custom');
 			if (button) {
 				button.setAttribute('aria-pressed', isNowFullscreen ? 'true' : 'false');
-				button.setAttribute(
-					'aria-label',
-					isNowFullscreen ? 'Exit fullscreen map view' : 'Toggle fullscreen map view'
-				);
+				button.setAttribute('aria-label', isNowFullscreen ? 'Exit fullscreen map view' : 'Toggle fullscreen map view');
 			}
 
 			setTimeout(() => {
@@ -447,9 +474,7 @@ export default function MapEditor({
 					<MapViewSync center={center} zoom={zoom} />
 					<FullscreenControl />
 					<MapInteractionHandler onMapClick={onMapClick} onZoomChange={onZoomChange} />
-					{markerPosition && (
-						<DraggableMarker position={markerPosition} onDragEnd={onMarkerDrag} label={markerLabel} />
-					)}
+					{markerPosition && <DraggableMarker position={markerPosition} onDragEnd={onMarkerDrag} label={markerLabel} />}
 				</MapContainer>
 				{isMapLoading && (
 					<div

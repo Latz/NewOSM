@@ -14,21 +14,51 @@
         .leaflet-container {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
             cursor: crosshair;
-
-            // Fix for scrambled tiles - protect dimensions and positioning
-            img.leaflet-tile {
-                max-width: none !important;
-                max-height: none !important;
-                width: 256px !important;
-                height: 256px !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                border: none !important;
-                box-sizing: content-box !important;
-                object-fit: fill !important;
-                display: block !important;
-            }
         }
+    }
+}
+
+// CRITICAL: Fix for scrambled tiles - MUST be outside nested selectors for maximum specificity
+// This applies to tiles in both main document and iframe (block editor canvas)
+// Using multiple selectors to ensure at least one matches in all contexts
+.wp-block-newopm-osm-map .newopm-map-container .leaflet-container .leaflet-tile-pane img.leaflet-tile,
+.wp-block-newopm-osm-map .newopm-map-container .leaflet-tile-pane img.leaflet-tile,
+.wp-block-newopm-osm-map .leaflet-container img.leaflet-tile,
+.newopm-map-container .leaflet-tile-pane img.leaflet-tile,
+.leaflet-tile-pane img.leaflet-tile,
+img.leaflet-tile {
+    max-width: none !important;
+    max-height: none !important;
+    width: 256px !important;
+    height: 256px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-sizing: content-box !important;
+    object-fit: fill !important;
+    display: block !important;
+    position: absolute !important;
+}
+
+// Ensure tile pane and container have correct positioning
+.wp-block-newopm-osm-map {
+    .newopm-map-container {
+        .leaflet-tile-pane,
+        .leaflet-map-pane,
+        .leaflet-pane {
+            position: absolute !important;
+        }
+
+        .leaflet-container {
+            position: relative !important;
+            overflow: hidden !important;
+        }
+    }
+}
+
+// Re-apply other styles that were inside the nested block
+.wp-block-newopm-osm-map {
+    .newopm-map-container {
 
         // Prevent text selection during interaction
         .leaflet-container {
