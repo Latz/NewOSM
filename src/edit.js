@@ -217,7 +217,7 @@ const SIZE_PRESETS = {
 };
 
 // Custom pan handler that doesn't get stuck
-export default function Edit({ attributes, setAttributes }) {
+export default function Edit({ attributes, setAttributes, isSelected }) {
 	const { latitude, longitude, zoom, markerLat, markerLon, markerLabel, height, width, sizePreset, mapId } = attributes;
 	const [searchQuery, setSearchQuery] = useState('');
 	const [isSearching, setIsSearching] = useState(false);
@@ -411,9 +411,13 @@ export default function Edit({ attributes, setAttributes }) {
 
 	const handleMapClick = useCallback(
 		latlng => {
+			// Only set marker if block is selected/focused
+			if (!isSelected) {
+				return;
+			}
 			fetchAddress(latlng.lat, latlng.lng);
 		},
-		[fetchAddress]
+		[fetchAddress, isSelected]
 	);
 
 	const handleMarkerDrag = useCallback(
