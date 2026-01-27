@@ -226,8 +226,9 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 	const [markerAddress, setMarkerAddress] = useState('');
 	const [isMapLoading, setIsMapLoading] = useState(true);
 
-	// Track if block was already selected before map interaction
-	const wasSelectedRef = useRef(false);
+	// Track when block becomes selected to prevent immediate marker placement
+	const selectionTimeRef = useRef(0);
+	const isSelectedRef = useRef(isSelected);
 
 	// Generate and store a unique map ID when block is first created
 	// This ensures the ID stays consistent across saves and prevents block validation errors
@@ -239,9 +240,13 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 		}
 	}, []); // Empty dependency array = run once on mount
 
-	// Track selection state to prevent marker placement on initial selection click
+	// Track when block becomes selected to prevent marker placement on selection click
 	useEffect(() => {
-		wasSelectedRef.current = isSelected;
+		// If block just became selected (was false, now true)
+		if (!isSelectedRef.current && isSelected) {
+			selectionTimeRef.current = Date.now();
+		}
+		isSelectedRef.current = isSelected;
 	}, [isSelected]);
 
 	// Apply saved defaults on first load
@@ -419,11 +424,18 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 
 	const handleMapClick = useCallback(
 		latlng => {
-			// Only set marker if block was already selected before this click
-			// (prevents marker placement on the initial selection click)
-			if (!wasSelectedRef.current) {
+			// Prevent marker placement if block was just selected (within 150ms)
+			// This prevents the selection click from also placing a marker
+			const timeSinceSelection = Date.now() - selectionTimeRef.current;
+			if (timeSinceSelection < 150) {
 				return;
 			}
+
+			// Only place marker if block is currently selected
+			if (!isSelectedRef.current) {
+				return;
+			}
+
 			fetchAddress(latlng.lat, latlng.lng);
 		},
 		[fetchAddress]
