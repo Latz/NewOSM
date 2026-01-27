@@ -54,8 +54,10 @@ class NominatimRateLimiter {
 
 	/**
 	 * Make a rate-limited request to Nominatim
+	 * @param {string} url - The URL to fetch
+	 * @param {AbortSignal} signal - Optional AbortController signal for request cancellation
 	 */
-	async request(url) {
+	async request(url, signal = null) {
 		const cacheKey = this.getCacheKey(url);
 
 		// Check cache first
@@ -79,16 +81,28 @@ class NominatimRateLimiter {
 			await new Promise(resolve => setTimeout(resolve, timeToWait));
 		}
 
+		// Check if aborted during wait
+		if (signal && signal.aborted) {
+			throw new DOMException('Request aborted', 'AbortError');
+		}
+
 		// Create the request promise
 		const promise = (async () => {
 			try {
 				this.lastRequestTime = Date.now();
 
-				const response = await fetch(url, {
+				const fetchOptions = {
 					headers: {
 						'User-Agent': 'WordPress-NewOSM-Plugin/1.0',
 					},
-				});
+				};
+
+				// Add signal if provided
+				if (signal) {
+					fetchOptions.signal = signal;
+				}
+
+				const response = await fetch(url, fetchOptions);
 
 				// Handle rate limiting
 				if (response.status === 429) {
@@ -123,18 +137,23 @@ class NominatimRateLimiter {
 
 	/**
 	 * Search for a location
+	 * @param {string} query - The search query
+	 * @param {AbortSignal} signal - Optional AbortController signal for request cancellation
 	 */
-	async search(query) {
+	async search(query, signal = null) {
 		const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
-		return this.request(url);
+		return this.request(url, signal);
 	}
 
 	/**
 	 * Reverse geocode coordinates
+	 * @param {number} lat - Latitude
+	 * @param {number} lon - Longitude
+	 * @param {AbortSignal} signal - Optional AbortController signal for request cancellation
 	 */
-	async reverse(lat, lon) {
+	async reverse(lat, lon, signal = null) {
 		const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
-		return this.request(url);
+		return this.request(url, signal);
 	}
 }
 
@@ -295,8 +314,11 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 		}
 	}, [searchQuery, setAttributes, setMarkerAddress, setIsSearching]);
 
-	// Debounced reverse geocoding to prevent rapid API calls during marker dragging
+	// Adaptive debounced reverse geocoding to prevent rapid API calls during marker dragging
+	// Uses shorter debounce for single interactions, longer for rapid changes
 	const reverseGeocodeTimeout = useRef(null);
+	const lastReverseGeocodeTime = useRef(0);
+	const reverseGeocodeAbortController = useRef(null);
 
 	const fetchAddress = useCallback(
 		async (lat, lon) => {
@@ -308,18 +330,35 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 				markerLabel: coordLabel,
 			});
 
-			// Clear any pending reverse geocode request
+			// Cancel any pending API request
+			if (reverseGeocodeAbortController.current) {
+				reverseGeocodeAbortController.current.abort();
+			}
+
+			// Clear any pending reverse geocode timeout
 			if (reverseGeocodeTimeout.current) {
 				clearTimeout(reverseGeocodeTimeout.current);
 			}
 
-			// Debounce the reverse geocoding by 500ms
+			// Adaptive debouncing: Use shorter delay for first interaction,
+			// longer delay for rapid changes to reduce API load
+			const now = Date.now();
+			const timeSinceLastRequest = now - lastReverseGeocodeTime.current;
+			const isRapidChange = timeSinceLastRequest < 500;
+			const debounceDelay = isRapidChange ? 1000 : 200; // 1s for rapid changes, 200ms for single interactions
+
+			lastReverseGeocodeTime.current = now;
+
+			// Debounce the reverse geocoding
 			reverseGeocodeTimeout.current = setTimeout(async () => {
 				setIsLoadingAddress(true);
 				setMarkerAddress('');
 
+				// Create new AbortController for this request
+				reverseGeocodeAbortController.current = new AbortController();
+
 				try {
-					const data = await nominatimAPI.reverse(lat, lon);
+					const data = await nominatimAPI.reverse(lat, lon, reverseGeocodeAbortController.current.signal);
 
 					if (data && data.display_name) {
 						setMarkerAddress(data.display_name);
@@ -332,22 +371,29 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 						setMarkerAddress('');
 					}
 				} catch (error) {
+					// Ignore abort errors (expected when user is still interacting)
+					if (error.name === 'AbortError') {
+						return;
+					}
 					console.error('Reverse geocoding error:', error);
 					setMarkerAddress('');
 					// Don't show alert for reverse geocoding errors to avoid interrupting user workflow
 				} finally {
 					setIsLoadingAddress(false);
 				}
-			}, 500); // Wait 500ms after user stops dragging before making request
+			}, debounceDelay);
 		},
 		[setAttributes]
 	);
 
-	// Cleanup debounce timeouts on unmount
+	// Cleanup debounce timeouts and abort controllers on unmount
 	useEffect(() => {
 		return () => {
 			if (reverseGeocodeTimeout.current) {
 				clearTimeout(reverseGeocodeTimeout.current);
+			}
+			if (reverseGeocodeAbortController.current) {
+				reverseGeocodeAbortController.current.abort();
 			}
 			if (zoomTimeoutRef.current) {
 				clearTimeout(zoomTimeoutRef.current);
