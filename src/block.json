@@ -5,7 +5,7 @@
 	"title": "OpenStreetMap",
 	"category": "media",
 	"icon": "location-alt",
-	"description": "Display an interactive OpenStreetMap with location search and marker placement.",
+	"description": "",
 	"keywords": ["map", "openstreetmap", "osm", "location", "marker"],
 	"version": "1.0.0",
 	"textdomain": "newopm",
