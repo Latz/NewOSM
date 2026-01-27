@@ -226,6 +226,9 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 	const [markerAddress, setMarkerAddress] = useState('');
 	const [isMapLoading, setIsMapLoading] = useState(true);
 
+	// Track if block was already selected before map interaction
+	const wasSelectedRef = useRef(false);
+
 	// Generate and store a unique map ID when block is first created
 	// This ensures the ID stays consistent across saves and prevents block validation errors
 	useEffect(() => {
@@ -235,6 +238,11 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 			});
 		}
 	}, []); // Empty dependency array = run once on mount
+
+	// Track selection state to prevent marker placement on initial selection click
+	useEffect(() => {
+		wasSelectedRef.current = isSelected;
+	}, [isSelected]);
 
 	// Apply saved defaults on first load
 	useEffect(() => {
@@ -411,13 +419,14 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 
 	const handleMapClick = useCallback(
 		latlng => {
-			// Only set marker if block is selected/focused
-			if (!isSelected) {
+			// Only set marker if block was already selected before this click
+			// (prevents marker placement on the initial selection click)
+			if (!wasSelectedRef.current) {
 				return;
 			}
 			fetchAddress(latlng.lat, latlng.lng);
 		},
-		[fetchAddress, isSelected]
+		[fetchAddress]
 	);
 
 	const handleMarkerDrag = useCallback(
