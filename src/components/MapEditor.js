@@ -136,7 +136,7 @@ L.Icon.Default.mergeOptions({
 /**
  * Component to handle map interactions (clicks and zoom changes)
  */
-function MapInteractionHandler({ onMapClick, onZoomChange }) {
+function MapInteractionHandler({ onMapClick, onZoomChange, isSelected }) {
 	const map = useMap();
 	const isDraggingRef = useRef(false);
 	const dragStartRef = useRef(null);
@@ -158,6 +158,7 @@ function MapInteractionHandler({ onMapClick, onZoomChange }) {
 
 		// Custom drag implementation
 		const mapContainer = map.getContainer();
+		const defaultCursor = isSelected ? 'crosshair' : 'default';
 
 		const handleMouseDown = e => {
 			// Don't initiate drag on marker
@@ -201,7 +202,7 @@ function MapInteractionHandler({ onMapClick, onZoomChange }) {
 			isDraggingRef.current = false;
 			dragStartRef.current = null;
 			initialCenterRef.current = null;
-			mapContainer.style.cursor = 'crosshair';
+			mapContainer.style.cursor = defaultCursor;
 
 			if (!wasDragging && e.target.classList.contains('leaflet-container')) {
 				const latlng = map.mouseEventToLatLng(e);
@@ -213,20 +214,20 @@ function MapInteractionHandler({ onMapClick, onZoomChange }) {
 			isDraggingRef.current = false;
 			dragStartRef.current = null;
 			initialCenterRef.current = null;
-			mapContainer.style.cursor = 'crosshair';
+			mapContainer.style.cursor = defaultCursor;
 		};
 
 		mapContainer.addEventListener('mousedown', handleMouseDown);
 		mapContainer.addEventListener('mousemove', handleMouseMove);
 		mapContainer.addEventListener('mouseup', handleMouseUp);
 		mapContainer.addEventListener('mouseleave', handleMouseLeave);
-		mapContainer.style.cursor = 'crosshair';
+		mapContainer.style.cursor = defaultCursor;
 
 		const handleGlobalMouseUp = () => {
 			isDraggingRef.current = false;
 			dragStartRef.current = null;
 			initialCenterRef.current = null;
-			mapContainer.style.cursor = 'crosshair';
+			mapContainer.style.cursor = defaultCursor;
 		};
 
 		document.addEventListener('mouseup', handleGlobalMouseUp);
@@ -242,7 +243,7 @@ function MapInteractionHandler({ onMapClick, onZoomChange }) {
 				map.dragging.enable();
 			}
 		};
-	}, [map, onMapClick, onZoomChange]);
+	}, [map, onMapClick, onZoomChange, isSelected]);
 
 	return null;
 }
@@ -450,6 +451,7 @@ export default function MapEditor({
 	markerLabel,
 	height,
 	isMapLoading,
+	isSelected,
 	onMapClick,
 	onZoomChange,
 	onMarkerDrag,
@@ -458,7 +460,7 @@ export default function MapEditor({
 	return (
 		<MapErrorBoundary>
 			<div
-				className='newopm-map-container'
+				className={`newopm-map-container ${!isSelected ? 'is-unselected' : ''}`}
 				style={{ height: height + 'px' }}
 				role='application'
 				aria-label='Interactive map editor for OpenStreetMap'
@@ -488,7 +490,7 @@ export default function MapEditor({
 					<MapLoadingHandler onMapReady={onMapReady} />
 					<MapViewSync center={center} zoom={zoom} />
 					<FullscreenControl />
-					<MapInteractionHandler onMapClick={onMapClick} onZoomChange={onZoomChange} />
+					<MapInteractionHandler onMapClick={onMapClick} onZoomChange={onZoomChange} isSelected={isSelected} />
 					{markerPosition && <DraggableMarker position={markerPosition} onDragEnd={onMarkerDrag} label={markerLabel} />}
 				</MapContainer>
 				{isMapLoading && (

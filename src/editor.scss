@@ -13,7 +13,7 @@
         // Ensure leaflet map takes full space
         .leaflet-container {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-            cursor: crosshair;
+            // Cursor is controlled by JavaScript based on selection state
         }
     }
 }

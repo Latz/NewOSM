@@ -6,73 +6,6 @@ import { __ } from '@wordpress/i18n';
 import { dispatch } from '@wordpress/data';
 import 'leaflet/dist/leaflet.css';
 
-// Inject critical tile CSS immediately to prevent scrambled tiles
-// This runs BEFORE lazy loading to ensure CSS is ready when map loads
-// Injects into both main document and iframe (for block editor canvas)
-if (typeof document !== 'undefined') {
-	const styleId = 'newopm-tile-fix';
-	const cssContent = `
-		.leaflet-tile-pane img.leaflet-tile,
-		.wp-block-newopm-osm-map img.leaflet-tile,
-		img.leaflet-tile {
-			max-width: none !important;
-			max-height: none !important;
-			width: 256px !important;
-			height: 256px !important;
-			margin: 0 !important;
-			padding: 0 !important;
-			border: none !important;
-			box-sizing: content-box !important;
-			object-fit: fill !important;
-			display: block !important;
-		}
-	`;
-
-	// Function to inject CSS into a document
-	const injectCSS = doc => {
-		// Safety checks: ensure doc, head, and getElementById exist
-		if (!doc || !doc.head || !doc.getElementById) {
-			return;
-		}
-
-		try {
-			if (!doc.getElementById(styleId)) {
-				const style = doc.createElement('style');
-				style.id = styleId;
-				style.textContent = cssContent;
-				doc.head.appendChild(style);
-			}
-		} catch (error) {
-			// Silently fail if we can't inject CSS
-			console.warn('NewOSM: Could not inject tile CSS:', error.message);
-		}
-	};
-
-	// Inject into main document
-	injectCSS(document);
-
-	// Inject into iframe (block editor canvas) if it exists
-	const checkIframe = () => {
-		try {
-			const iframe = document.querySelector('iframe[name="editor-canvas"]');
-			if (iframe && iframe.contentDocument && iframe.contentDocument.head) {
-				injectCSS(iframe.contentDocument);
-			}
-		} catch (error) {
-			// Silently fail if iframe is not accessible
-			console.warn('NewOSM: Could not access iframe:', error.message);
-		}
-	};
-
-	// Check immediately
-	checkIframe();
-
-	// Also check after a short delay (iframe might not be ready yet)
-	setTimeout(checkIframe, 100);
-	setTimeout(checkIframe, 500);
-	setTimeout(checkIframe, 1000);
-}
-
 // Lazy load the heavy map editor component
 // This improves initial editor load time by deferring ~440KB of Leaflet code
 const MapEditor = lazy(() => import('./components/MapEditor'));
@@ -722,6 +655,7 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 						markerLabel={markerLabel}
 						height={height}
 						isMapLoading={isMapLoading}
+						isSelected={isSelected}
 						onMapClick={handleMapClick}
 						onZoomChange={handleZoomChange}
 						onMarkerDrag={handleMarkerDrag}
