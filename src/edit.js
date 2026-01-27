@@ -612,11 +612,15 @@ export default function Edit({ attributes, setAttributes }) {
 								</p>
 							)}
 
-							{markerAddress && (
-								<p style={{ margin: '0 0 12px 0', fontSize: '13px', lineHeight: '1.4' }}>{markerAddress}</p>
-							)}
-
-							{!isLoadingAddress && !markerAddress && (
+							{markerAddress ? (
+								<p style={{ margin: '0 0 12px 0', fontSize: '13px', lineHeight: '1.4' }}>
+									{markerAddress}
+									<br />
+									<span style={{ fontSize: '11px', color: '#666' }}>
+										({markerLat.toFixed(5)}, {markerLon.toFixed(5)})
+									</span>
+								</p>
+							) : !isLoadingAddress && (
 								<p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#666' }}>
 									Lat: {markerLat.toFixed(5)}, Lon: {markerLon.toFixed(5)}
 								</p>
