@@ -150,13 +150,23 @@ const SIZE_PRESETS = {
 
 // Custom pan handler that doesn't get stuck
 export default function Edit({ attributes, setAttributes }) {
-	const { latitude, longitude, zoom, markerLat, markerLon, markerLabel, height, width, sizePreset } = attributes;
+	const { latitude, longitude, zoom, markerLat, markerLon, markerLabel, height, width, sizePreset, mapId } = attributes;
 	const [searchQuery, setSearchQuery] = useState('');
 	const [isSearching, setIsSearching] = useState(false);
 	const [useCustomSize, setUseCustomSize] = useState(sizePreset === 'custom');
 	const [isLoadingAddress, setIsLoadingAddress] = useState(false);
 	const [markerAddress, setMarkerAddress] = useState('');
 	const [isMapLoading, setIsMapLoading] = useState(true);
+
+	// Generate and store a unique map ID when block is first created
+	// This ensures the ID stays consistent across saves and prevents block validation errors
+	useEffect(() => {
+		if (!mapId) {
+			setAttributes({
+				mapId: `newopm-map-${Math.random().toString(36).substring(2, 11)}`,
+			});
+		}
+	}, []); // Empty dependency array = run once on mount
 
 	// Apply saved defaults on first load
 	useEffect(() => {
@@ -615,9 +625,7 @@ export default function Edit({ attributes, setAttributes }) {
 						>
 							<div style={{ textAlign: 'center' }}>
 								<Spinner />
-								<p style={{ marginTop: '16px', color: '#666' }}>
-									{__('Loading map editor...', 'newopm')}
-								</p>
+								<p style={{ marginTop: '16px', color: '#666' }}>{__('Loading map editor...', 'newopm')}</p>
 							</div>
 						</div>
 					}

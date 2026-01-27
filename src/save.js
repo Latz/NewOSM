@@ -2,7 +2,7 @@ import { useBlockProps } from '@wordpress/block-editor';
 import { __ } from '@wordpress/i18n';
 
 export default function save({ attributes }) {
-	const { latitude, longitude, zoom, markerLat, markerLon, markerLabel, height, width } = attributes;
+	const { latitude, longitude, zoom, markerLat, markerLon, markerLabel, height, width, mapId } = attributes;
 	const blockProps = useBlockProps.save();
 
 	// Validate coordinates to prevent rendering invalid maps
@@ -13,21 +13,27 @@ export default function save({ attributes }) {
 	if (!validLat || !validLon || !validZoom) {
 		return (
 			<div {...blockProps}>
-				<div className='newopm-map-error' style={{ padding: '20px', border: '2px solid #dc3232', borderRadius: '4px', backgroundColor: '#fef7f7' }}>
+				<div
+					className='newopm-map-error'
+					style={{ padding: '20px', border: '2px solid #dc3232', borderRadius: '4px', backgroundColor: '#fef7f7' }}
+				>
 					<p style={{ margin: 0, color: '#dc3232' }}>
-						<strong>{__('Invalid map configuration:', 'newopm')}</strong> {__('Please check the map coordinates and zoom level in the block settings.', 'newopm')}
+						<strong>{__('Invalid map configuration:', 'newopm')}</strong>{' '}
+						{__('Please check the map coordinates and zoom level in the block settings.', 'newopm')}
 					</p>
 				</div>
 			</div>
 		);
 	}
 
-	const mapId = `newopm-map-${Math.random().toString(36).substring(2, 11)}`;
+	// Use the mapId from attributes (generated once when block is created)
+	// For old blocks without mapId, use a deterministic default
+	const finalMapId = mapId || 'newopm-map-default';
 
 	return (
 		<div {...blockProps}>
 			<div
-				id={mapId}
+				id={finalMapId}
 				className='newopm-map-frontend'
 				data-lat={latitude}
 				data-lon={longitude}

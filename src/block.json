@@ -47,6 +47,9 @@
 		"customDefaultsApplied": {
 			"type": "boolean",
 			"default": false
+		},
+		"mapId": {
+			"type": "string"
 		}
 	},
 	"supports": {
