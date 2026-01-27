@@ -6,6 +6,17 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
+// Fix for default marker icons in Leaflet with Webpack
+delete L.Icon.Default.prototype._getIconUrl;
+
+const pluginUrl = window.newOpmData?.pluginUrl?.replace(/\/$/, '') || '';
+
+L.Icon.Default.mergeOptions({
+	iconRetinaUrl: pluginUrl + '/assets/leaflet/marker-icon-2x.png',
+	iconUrl: pluginUrl + '/assets/leaflet/marker-icon.png',
+	shadowUrl: pluginUrl + '/assets/leaflet/marker-shadow.png',
+});
+
 // Store map instances and cleanup functions for proper disposal
 const mapInstances = new WeakMap(); // Maps DOM elements to { map, cleanup }
 
