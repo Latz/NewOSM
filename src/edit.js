@@ -250,6 +250,34 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 		loadDefaults();
 	}, []);
 
+	// Load address for existing marker on editor mount
+	useEffect(() => {
+		const loadExistingMarkerAddress = async () => {
+			// Only fetch if we have marker coordinates but no label or address yet
+			if (markerLat && markerLon && !markerAddress) {
+				setIsLoadingAddress(true);
+				try {
+					const data = await nominatimAPI.reverse(markerLat, markerLon);
+					if (data && data.display_name) {
+						setMarkerAddress(data.display_name);
+						// Only update markerLabel if it's just coordinates or empty
+						if (!markerLabel || markerLabel.startsWith('Lat:')) {
+							setAttributes({
+								markerLabel: data.display_name,
+							});
+						}
+					}
+				} catch (error) {
+					console.error('Error loading marker address:', error);
+				} finally {
+					setIsLoadingAddress(false);
+				}
+			}
+		};
+
+		loadExistingMarkerAddress();
+	}, []); // Run once on mount
+
 	const blockProps = useBlockProps({
 		style: {
 			minHeight: height + 'px',
