@@ -9,6 +9,7 @@ import { Component, useEffect, useRef, useState, useMemo } from '@wordpress/elem
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { __ } from '@wordpress/i18n';
 import L from 'leaflet';
+import { applySVGMarkerIcons } from '../utils/markerIcons';
 
 /**
  * Error Boundary Component
@@ -122,16 +123,9 @@ class MapErrorBoundary extends Component {
 	}
 }
 
-// Fix for default marker icons in Leaflet with Webpack
-delete L.Icon.Default.prototype._getIconUrl;
-
-const pluginUrl = window.newOpmData?.pluginUrl?.replace(/\/$/, '') || '';
-
-L.Icon.Default.mergeOptions({
-	iconRetinaUrl: pluginUrl + '/assets/leaflet/marker-icon-2x.png',
-	iconUrl: pluginUrl + '/assets/leaflet/marker-icon.png',
-	shadowUrl: pluginUrl + '/assets/leaflet/marker-shadow.png',
-});
+// Apply SVG marker icons to eliminate HTTP requests for PNG files
+// See FUTURE_OPTIMIZATIONS.md #5 - Optimize Marker Icons
+applySVGMarkerIcons(L);
 
 /**
  * Component to handle map interactions (clicks and zoom changes)
