@@ -101,23 +101,25 @@ img.leaflet-tile {
     color: #333;
 }
 
-// Fullscreen button - improved contrast and visibility
-// Override leaflet.fullscreen plugin default icons with darker versions
-:root {
-    --fullscreen-icon-enter: url('data:image/svg+xml,<svg viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg"><path d="M5 10.3V5.9c0-.5.4-.9.9-.9h4.4c.2 0 .4.2.4.4V7c0 .2-.2.4-.4.4h-3v3c0 .2-.2.4-.4.4H5.4a.4.4 0 0 1-.4-.4zm10.3-4.9V7c0 .2.2.4.4.4h3v3c0 .2.2.4.4.4h1.5c.2 0 .4-.2.4-.4V5.9c0-.5-.4-.9-.9-.9h-4.4c-.2 0-.4.2-.4.4zm5.3 9.9H19c-.2 0-.4.2-.4.4v3h-3c-.2 0-.4.2-.4.4v1.5c0 .2.2.4.4.4h4.4c.5 0 .9-.4.9-.9v-4.4c0-.2-.2-.4-.4-.4zm-9.9 5.3V19c0-.2-.2-.4-.4-.4h-3v-3c0-.2-.2-.4-.4-.4H5.4c-.2 0-.4.2-.4.4v4.4c0 .5.4.9.9.9h4.4c.2 0 .4-.2.4-.4z" fill="%23000"/></svg>');
-    --fullscreen-icon-exit: url('data:image/svg+xml,<svg viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg"><path d="M20.6 10.7H16a.9.9 0 0 1-.8-.8v-4.5c0-.2.2-.4.4-.4h1.4c.3 0 .5.2.5.4v3h3c.2 0 .4.2.4.5v1.4c0 .2-.2.4-.4.4zm-9.9-.8V5.4c0-.2-.2-.4-.4-.4H8.9c-.3 0-.5.2-.5.4v3h-3c-.2 0-.4.2-.4.5v1.4c0 .2.2.4.4.4H9.9c.4 0 .8-.4.8-.8zm0 10.7V16c0-.4-.4-.8-.8-.8H5.4c-.2 0-.4.2-.4.4v1.4c0 .3.2.5.4.5h3v3c0 .2.2.4.5.4h1.4c.2 0 .4-.2.4-.4zm6.9 0v-3h3c.2 0 .4-.2.4-.5v-1.4c0-.2-.2-.4-.4-.4H16c-.4 0-.8.4-.8.8v4.5c0 .2.2.4.4.4h1.5c.3 0 .5-.2.5-.4z" fill="%23000"/></svg>');
-}
+// Fullscreen button - improved contrast and visibility in editor
+// Scope to editor block to ensure higher specificity
+.wp-block-newopm-osm-map {
+    // Override leaflet.fullscreen plugin default icons with darker versions
+    // Using base64-encoded SVG with black fill to ensure it's not stripped by PostCSS
+    --fullscreen-icon-enter: url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjYgMjYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZmlsbD0iIzAwMCIgZD0iTTUgMTAuM1Y1LjljMC0uNS40LS45LjktLjloNC40Yy4yIDAgLjQuMi40LjRWN2MwIC4yLS4yLjQtLjQuNGgtM3YzYzAgLjItLjIuNC0uNC40SDUuNGEuNC40IDAgMCAxLS40LS40em0xMC4zLTQuOVY3YzAgLjIuMi40LjQuNGgzdjNjMCAuMi4yLjQuNC40aDEuNWMuMiAwIC40LS4yLjQtLjRWNS45YzAtLjUtLjQtLjktLjktLjloLTQuNGMtLjIgMC0uNC4yLS40LjR6bTUuMyA5LjlIMTljLS4yIDAtLjQuMi0uNC40djNoLTNjLS4yIDAtLjQuMi0uNC40djEuNWMwIC4yLjIuNC40LjRoNC40Yy41IDAgLjktLjQuOS0uOXYtNC40YzAtLjItLjItLjQtLjQtLjR6bS05LjkgNS4zVjE5YzAtLjItLjItLjQtLjQtLjRoLTN2LTNjMC0uMi0uMi0uNC0uNC0uNEg1LjRjLS4yIDAtLjQuMi0uNC40djQuNGMwIC41LjQuOS45LjloNC40Yy4yIDAgLjQtLjIuNC0uNHoiLz48L3N2Zz4=');
+    --fullscreen-icon-exit: url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjYgMjYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZmlsbD0iIzAwMCIgZD0iTTIwLjYgMTAuN0gxNmEuOS45IDAgMCAxLS44LS44di00LjVjMC0uMi4yLS40LjQtLjRoMS40Yy4zIDAgLjUuMi41LjR2M2gzYy4yIDAgLjQuMi40LjV2MS40YzAgLjItLjIuNC0uNC40em0tOS45LS44VjUuNGMwLS4yLS4yLS40LS40LS40SDguOWMtLjMgMC0uNS4yLS41LjR2M2gtM2MtLjIgMC0uNC4yLS40LjV2MS40YzAgLjIuMi40LjQuNEg5LjljLjQgMCAuOC0uNC44LS44em0wIDEwLjdWMTZjMC0uNC0uNC0uOC0uOC0uOEg1LjRjLS4yIDAtLjQuMi0uNC40djEuNGMwIC4zLjIuNS40LjVoM3YzYzAgLjIuMi40LjUuNGgxLjRjLjIgMCAuNC0uMi40LS40em02LjkgMHYtM2gzYy4yIDAgLjQtLjIuNC0uNXYtMS40YzAtLjItLjItLjQtLjQtLjRIMTZjLS40IDAtLjguNC0uOC44djQuNWMwIC4yLjIuNC40LjRoMS41Yy4zIDAgLjUtLjIuNS0uNHoiLz48L3N2Zz4=');
 
-// Improve fullscreen button contrast
-.leaflet-control-fullscreen {
-    a {
-        background-color: white !important;
-        border: 2px solid rgba(0,0,0,0.3) !important;
-        color: #000 !important;
+    // Improve fullscreen button contrast with very high specificity
+    .leaflet-control-fullscreen {
+        a {
+            background-color: white !important;
+            border: 2px solid rgba(0,0,0,0.3) !important;
+            color: #000 !important;
 
-        &:hover {
-            background-color: #f4f4f4 !important;
-            border-color: rgba(0,0,0,0.4) !important;
+            &:hover {
+                background-color: #f4f4f4 !important;
+                border-color: rgba(0,0,0,0.4) !important;
+            }
         }
     }
 }
