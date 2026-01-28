@@ -10,6 +10,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { __ } from '@wordpress/i18n';
 import L from 'leaflet';
 import { applySVGMarkerIcons } from '../utils/markerIcons';
+import { getEditorTileConfig } from '../utils/devicePerformance';
 
 /**
  * Error Boundary Component
@@ -462,6 +463,10 @@ export default function MapEditor({
 	onMarkerDrag,
 	onMapReady,
 }) {
+	// Get optimal tile configuration based on device performance
+	// See FUTURE_OPTIMIZATIONS.md #3 - Virtualize Tile Rendering
+	const tileConfig = useMemo(() => getEditorTileConfig(), []);
+
 	return (
 		<MapErrorBoundary>
 			<div
@@ -486,9 +491,9 @@ export default function MapEditor({
 						attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 						url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 						maxZoom={19}
-						updateWhenIdle={false}
-						updateWhenZooming={true}
-						keepBuffer={4}
+						updateWhenIdle={tileConfig.updateWhenIdle}
+						updateWhenZooming={tileConfig.updateWhenZooming}
+						keepBuffer={tileConfig.keepBuffer}
 						maxNativeZoom={19}
 						minZoom={2}
 					/>

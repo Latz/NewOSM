@@ -6,10 +6,15 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { applySVGMarkerIcons } from './utils/markerIcons';
+import { getFrontendTileConfig } from './utils/devicePerformance';
 
 // Apply SVG marker icons to eliminate HTTP requests for PNG files
 // See FUTURE_OPTIMIZATIONS.md #5 - Optimize Marker Icons
 applySVGMarkerIcons(L);
+
+// Get optimal tile configuration based on device performance
+// See FUTURE_OPTIMIZATIONS.md #3 - Virtualize Tile Rendering
+const tileConfig = getFrontendTileConfig();
 
 // Store map instances and cleanup functions for proper disposal
 const mapInstances = new WeakMap(); // Maps DOM elements to { map, cleanup }
@@ -137,14 +142,15 @@ function initializeNewOpmMaps() {
 			}, 100);
 			cleanupFunctions.push(() => clearTimeout(resizeTimeout));
 
-			// Add tile layer with performance optimizations
+			// Add tile layer with dynamic performance optimizations
+			// Configuration adjusts based on device capabilities
 			L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 				attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
 				maxZoom: 19,
-				tileSize: 256,
-				updateWhenIdle: true, // Only update tiles when map stops moving
-				updateWhenZooming: false, // Don't update during zoom animation
-				keepBuffer: 2, // Keep 2 tile rows/cols in buffer for smoother panning
+				tileSize: tileConfig.tileSize,
+				updateWhenIdle: tileConfig.updateWhenIdle,
+				updateWhenZooming: tileConfig.updateWhenZooming,
+				keepBuffer: tileConfig.keepBuffer,
 				maxNativeZoom: 19,
 				minZoom: 2,
 			}).addTo(map);
