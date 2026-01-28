@@ -9,6 +9,8 @@ import { Component, useEffect, useRef, useState, useMemo } from '@wordpress/elem
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { __ } from '@wordpress/i18n';
 import L from 'leaflet';
+import { FullScreen } from 'leaflet.fullscreen';
+import 'leaflet.fullscreen/dist/Control.FullScreen.css';
 import { applySVGMarkerIcons } from '../utils/markerIcons';
 import { getEditorTileConfig } from '../utils/devicePerformance';
 
@@ -339,89 +341,22 @@ function MapLoadingHandler({ onMapReady }) {
  */
 function FullscreenControl() {
 	const map = useMap();
-	const [isFullscreen, setIsFullscreen] = useState(false);
 
 	useEffect(() => {
 		if (!map) return;
 
-		const mapContainer = map.getContainer();
-		const control = L.control({ position: 'topright' });
+		// Add the leaflet.fullscreen control
+		const fullscreenControl = new FullScreen({
+			position: 'topright',
+			title: 'Show fullscreen',
+			titleCancel: 'Exit fullscreen',
+			forceSeparateButton: true,
+		});
 
-		control.onAdd = function () {
-			const button = L.DomUtil.create('button', 'leaflet-bar leaflet-control leaflet-control-custom');
-			button.innerHTML = '⛶';
-			button.title = 'Toggle Fullscreen';
-			button.style.backgroundColor = 'white';
-			button.style.width = '30px';
-			button.style.height = '30px';
-			button.style.fontSize = '20px';
-			button.style.cursor = 'pointer';
-			button.style.border = '2px solid rgba(0,0,0,0.2)';
-			button.style.borderRadius = '4px';
-			button.style.color = '#333';
-			button.style.display = 'flex';
-			button.style.alignItems = 'center';
-			button.style.justifyContent = 'center';
-			button.style.padding = '0';
-			button.style.lineHeight = '1';
+		map.addControl(fullscreenControl);
 
-			button.setAttribute('aria-label', 'Toggle fullscreen map view');
-			button.setAttribute('role', 'button');
-			button.setAttribute('type', 'button');
-			button.setAttribute('aria-pressed', 'false');
-
-			L.DomEvent.disableClickPropagation(button);
-			L.DomEvent.on(button, 'click', function (e) {
-				e.preventDefault();
-				e.stopPropagation();
-
-				const container = mapContainer.closest('.newopm-map-container');
-				if (!container) return;
-
-				if (!isFullscreen) {
-					if (container.requestFullscreen) {
-						container.requestFullscreen();
-					} else if (container.mozRequestFullScreen) {
-						container.mozRequestFullScreen();
-					} else if (container.webkitRequestFullscreen) {
-						container.webkitRequestFullscreen();
-					} else if (container.msRequestFullscreen) {
-						container.msRequestFullscreen();
-					}
-				} else {
-					if (document.exitFullscreen) {
-						document.exitFullscreen();
-					} else if (document.mozCancelFullScreen) {
-						document.mozCancelFullScreen();
-					} else if (document.webkitExitFullscreen) {
-						document.webkitExitFullscreen();
-					} else if (document.msExitFullscreen) {
-						document.msExitFullscreen();
-					}
-				}
-			});
-
-			return button;
-		};
-
-		control.addTo(map);
-
-		const handleFullscreenChange = () => {
-			const isNowFullscreen = !!(
-				document.fullscreenElement ||
-				document.mozFullScreenElement ||
-				document.webkitFullscreenElement ||
-				document.msFullscreenElement
-			);
-
-			setIsFullscreen(isNowFullscreen);
-
-			const button = mapContainer.querySelector('.leaflet-control-custom');
-			if (button) {
-				button.setAttribute('aria-pressed', isNowFullscreen ? 'true' : 'false');
-				button.setAttribute('aria-label', isNowFullscreen ? 'Exit fullscreen map view' : 'Toggle fullscreen map view');
-			}
-
+		// Handle map resize on fullscreen change
+		const handleResize = () => {
 			setTimeout(() => {
 				if (map) {
 					map.invalidateSize();
@@ -429,19 +364,15 @@ function FullscreenControl() {
 			}, 100);
 		};
 
-		document.addEventListener('fullscreenchange', handleFullscreenChange);
-		document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-		document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-		document.addEventListener('msfullscreenchange', handleFullscreenChange);
+		map.on('enterFullscreen', handleResize);
+		map.on('exitFullscreen', handleResize);
 
 		return () => {
-			control.remove();
-			document.removeEventListener('fullscreenchange', handleFullscreenChange);
-			document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-			document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-			document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+			map.off('enterFullscreen', handleResize);
+			map.off('exitFullscreen', handleResize);
+			map.removeControl(fullscreenControl);
 		};
-	}, [map, isFullscreen]);
+	}, [map]);
 
 	return null;
 }

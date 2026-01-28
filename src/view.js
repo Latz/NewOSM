@@ -5,6 +5,8 @@
 
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { FullScreen } from 'leaflet.fullscreen';
+import 'leaflet.fullscreen/dist/Control.FullScreen.css';
 import { applySVGMarkerIcons } from './utils/markerIcons';
 import { getFrontendTileConfig } from './utils/devicePerformance';
 
@@ -163,11 +165,31 @@ function initializeNewOpmMaps() {
 				}
 			}
 
-			// Add fullscreen control and get its cleanup function
-			const fullscreenCleanup = addFullscreenControl(map, mapElement);
-			if (fullscreenCleanup) {
-				cleanupFunctions.push(fullscreenCleanup);
-			}
+			// Add leaflet.fullscreen plugin control
+			const fullscreenControl = new FullScreen({
+				position: 'topright',
+				title: 'Show fullscreen',
+				titleCancel: 'Exit fullscreen',
+				forceSeparateButton: true,
+			});
+			map.addControl(fullscreenControl);
+
+			// Handle map resize on fullscreen change
+			const handleFullscreenResize = function () {
+				setTimeout(() => {
+					if (map) {
+						map.invalidateSize();
+					}
+				}, 100);
+			};
+			map.on('enterFullscreen', handleFullscreenResize);
+			map.on('exitFullscreen', handleFullscreenResize);
+
+			// Add cleanup for fullscreen control
+			cleanupFunctions.push(function () {
+				map.off('enterFullscreen', handleFullscreenResize);
+				map.off('exitFullscreen', handleFullscreenResize);
+			});
 
 			// Remove loading overlay when map is ready
 			map.whenReady(function () {
@@ -196,130 +218,6 @@ function initializeNewOpmMaps() {
 			console.error('NewOSM: Error initializing map', error);
 		}
 	});
-}
-
-/**
- * Add fullscreen control to map
- * @param {Object} map - Leaflet map instance
- * @param {HTMLElement} mapElement - Map container element
- * @returns {Function} Cleanup function to remove event listeners
- */
-function addFullscreenControl(map, mapElement) {
-	const fullscreenButton = L.control({ position: 'topright' });
-
-	fullscreenButton.onAdd = function () {
-		const button = L.DomUtil.create('button', 'leaflet-bar leaflet-control leaflet-control-custom');
-		button.innerHTML = '⛶';
-		button.title = 'Toggle Fullscreen';
-		button.style.backgroundColor = 'white';
-		button.style.width = '30px';
-		button.style.height = '30px';
-		button.style.fontSize = '20px';
-		button.style.cursor = 'pointer';
-		button.style.border = '2px solid rgba(0,0,0,0.2)';
-		button.style.borderRadius = '4px';
-		button.style.color = '#333';
-		button.style.display = 'flex';
-		button.style.alignItems = 'center';
-		button.style.justifyContent = 'center';
-		button.style.padding = '0';
-		button.style.lineHeight = '1';
-
-		// Accessibility attributes
-		button.setAttribute('aria-label', 'Toggle fullscreen map view');
-		button.setAttribute('role', 'button');
-		button.setAttribute('type', 'button');
-		button.setAttribute('aria-pressed', 'false');
-
-		L.DomEvent.disableClickPropagation(button);
-		L.DomEvent.on(button, 'click', function (e) {
-			e.preventDefault();
-			e.stopPropagation();
-			toggleFullscreen(mapElement, map);
-		});
-
-		return button;
-	};
-
-	fullscreenButton.addTo(map);
-
-	// Handle fullscreen changes
-	const handleFullscreenChange = function () {
-		const isFullscreen = !!(
-			document.fullscreenElement ||
-			document.mozFullScreenElement ||
-			document.webkitFullscreenElement ||
-			document.msFullscreenElement
-		);
-
-		// Update ARIA attributes
-		const fullscreenBtn = mapElement.querySelector('.leaflet-control-custom');
-		if (fullscreenBtn) {
-			fullscreenBtn.setAttribute('aria-pressed', isFullscreen ? 'true' : 'false');
-			fullscreenBtn.setAttribute(
-				'aria-label',
-				isFullscreen ? 'Exit fullscreen map view' : 'Toggle fullscreen map view'
-			);
-		}
-
-		setTimeout(() => {
-			if (map) {
-				map.invalidateSize();
-			}
-		}, 100);
-	};
-
-	// Add event listeners
-	document.addEventListener('fullscreenchange', handleFullscreenChange);
-	document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-	document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-	document.addEventListener('msfullscreenchange', handleFullscreenChange);
-
-	// Return cleanup function to remove event listeners
-	return function cleanup() {
-		document.removeEventListener('fullscreenchange', handleFullscreenChange);
-		document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-		document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-		document.removeEventListener('msfullscreenchange', handleFullscreenChange);
-	};
-}
-
-/**
- * Toggle fullscreen mode
- * @param {HTMLElement} element - Element to make fullscreen
- * @param {Object} map - Leaflet map instance
- */
-function toggleFullscreen(element, map) {
-	const isFullscreen = !!(
-		document.fullscreenElement ||
-		document.mozFullScreenElement ||
-		document.webkitFullscreenElement ||
-		document.msFullscreenElement
-	);
-
-	if (!isFullscreen) {
-		// Enter fullscreen
-		if (element.requestFullscreen) {
-			element.requestFullscreen();
-		} else if (element.mozRequestFullScreen) {
-			element.mozRequestFullScreen();
-		} else if (element.webkitRequestFullscreen) {
-			element.webkitRequestFullscreen();
-		} else if (element.msRequestFullscreen) {
-			element.msRequestFullscreen();
-		}
-	} else {
-		// Exit fullscreen
-		if (document.exitFullscreen) {
-			document.exitFullscreen();
-		} else if (document.mozCancelFullScreen) {
-			document.mozCancelFullScreen();
-		} else if (document.webkitExitFullscreen) {
-			document.webkitExitFullscreen();
-		} else if (document.msExitFullscreen) {
-			document.msExitFullscreen();
-		}
-	}
 }
 
 // Clean up all maps when page is unloaded or navigated away
