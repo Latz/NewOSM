@@ -663,6 +663,45 @@ function newopm_register_rest_routes() {
             )
         )
     ));
+
+    // Nominatim search proxy endpoint
+    register_rest_route('newopm/v1', '/nominatim/search', array(
+        'methods' => 'GET',
+        'callback' => 'newopm_rest_nominatim_search',
+        'permission_callback' => function() {
+            return current_user_can('edit_posts');
+        },
+        'args' => array(
+            'q' => array(
+                'required' => true,
+                'type' => 'string',
+                'sanitize_callback' => 'sanitize_text_field'
+            )
+        )
+    ));
+
+    // Nominatim reverse geocoding proxy endpoint
+    register_rest_route('newopm/v1', '/nominatim/reverse', array(
+        'methods' => 'GET',
+        'callback' => 'newopm_rest_nominatim_reverse',
+        'permission_callback' => function() {
+            return current_user_can('edit_posts');
+        },
+        'args' => array(
+            'lat' => array(
+                'required' => true,
+                'type' => 'number',
+                'sanitize_callback' => 'newopm_sanitize_float',
+                'validate_callback' => 'newopm_validate_latitude'
+            ),
+            'lon' => array(
+                'required' => true,
+                'type' => 'number',
+                'sanitize_callback' => 'newopm_sanitize_float',
+                'validate_callback' => 'newopm_validate_longitude'
+            )
+        )
+    ));
 }
 add_action('rest_api_init', 'newopm_register_rest_routes');
 
@@ -751,4 +790,130 @@ function newopm_rest_save_defaults($request) {
             array('status' => 500)
         );
     }
+}
+
+/**
+ * REST API: Nominatim search proxy
+ *
+ * Proxies search requests to Nominatim API to avoid CORS issues.
+ *
+ * @param WP_REST_Request $request Request object
+ * @return WP_REST_Response|WP_Error Response object on success, or WP_Error object on failure
+ */
+function newopm_rest_nominatim_search($request) {
+    $query = $request->get_param('q');
+
+    $url = sprintf(
+        'https://nominatim.openstreetmap.org/search?format=json&q=%s&limit=1',
+        urlencode($query)
+    );
+
+    $response = wp_remote_get($url, array(
+        'headers' => array(
+            'User-Agent' => 'WordPress-NewOSM-Plugin/1.0'
+        ),
+        'timeout' => 10
+    ));
+
+    if (is_wp_error($response)) {
+        return new WP_Error(
+            'newopm_nominatim_error',
+            __('Failed to connect to geocoding service', 'newopm'),
+            array('status' => 500)
+        );
+    }
+
+    $status_code = wp_remote_retrieve_response_code($response);
+    if ($status_code === 429) {
+        return new WP_Error(
+            'newopm_rate_limit',
+            __('Rate limited. Please wait a moment before trying again.', 'newopm'),
+            array('status' => 429)
+        );
+    }
+
+    if ($status_code !== 200) {
+        return new WP_Error(
+            'newopm_nominatim_error',
+            sprintf(__('Geocoding service error: HTTP %d', 'newopm'), $status_code),
+            array('status' => $status_code)
+        );
+    }
+
+    $body = wp_remote_retrieve_body($response);
+    $data = json_decode($body, true);
+
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        return new WP_Error(
+            'newopm_parse_error',
+            __('Failed to parse geocoding response', 'newopm'),
+            array('status' => 500)
+        );
+    }
+
+    return rest_ensure_response($data);
+}
+
+/**
+ * REST API: Nominatim reverse geocoding proxy
+ *
+ * Proxies reverse geocoding requests to Nominatim API to avoid CORS issues.
+ *
+ * @param WP_REST_Request $request Request object
+ * @return WP_REST_Response|WP_Error Response object on success, or WP_Error object on failure
+ */
+function newopm_rest_nominatim_reverse($request) {
+    $lat = $request->get_param('lat');
+    $lon = $request->get_param('lon');
+
+    $url = sprintf(
+        'https://nominatim.openstreetmap.org/reverse?format=json&lat=%s&lon=%s&zoom=18&addressdetails=1',
+        $lat,
+        $lon
+    );
+
+    $response = wp_remote_get($url, array(
+        'headers' => array(
+            'User-Agent' => 'WordPress-NewOSM-Plugin/1.0'
+        ),
+        'timeout' => 10
+    ));
+
+    if (is_wp_error($response)) {
+        return new WP_Error(
+            'newopm_nominatim_error',
+            __('Failed to connect to geocoding service', 'newopm'),
+            array('status' => 500)
+        );
+    }
+
+    $status_code = wp_remote_retrieve_response_code($response);
+    if ($status_code === 429) {
+        return new WP_Error(
+            'newopm_rate_limit',
+            __('Rate limited. Please wait a moment before trying again.', 'newopm'),
+            array('status' => 429)
+        );
+    }
+
+    if ($status_code !== 200) {
+        return new WP_Error(
+            'newopm_nominatim_error',
+            sprintf(__('Geocoding service error: HTTP %d', 'newopm'), $status_code),
+            array('status' => $status_code)
+        );
+    }
+
+    $body = wp_remote_retrieve_body($response);
+    $data = json_decode($body, true);
+
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        return new WP_Error(
+            'newopm_parse_error',
+            __('Failed to parse geocoding response', 'newopm'),
+            array('status' => 500)
+        );
+    }
+
+    return rest_ensure_response($data);
 }

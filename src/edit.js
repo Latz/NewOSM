@@ -26,8 +26,8 @@ class NominatimRateLimiter {
 	/**
 	 * Get cache key for a request
 	 */
-	getCacheKey(url) {
-		return url;
+	getCacheKey(key) {
+		return key;
 	}
 
 	/**
@@ -53,12 +53,13 @@ class NominatimRateLimiter {
 	}
 
 	/**
-	 * Make a rate-limited request to Nominatim
-	 * @param {string} url - The URL to fetch
+	 * Make a rate-limited request to Nominatim via WordPress proxy
+	 * @param {string} endpoint - The WordPress API endpoint
+	 * @param {Object} params - Query parameters
 	 * @param {AbortSignal} signal - Optional AbortController signal for request cancellation
 	 */
-	async request(url, signal = null) {
-		const cacheKey = this.getCacheKey(url);
+	async request(endpoint, params, signal = null) {
+		const cacheKey = this.getCacheKey(`${endpoint}?${JSON.stringify(params)}`);
 
 		// Check cache first
 		const cached = this.getCached(cacheKey);
@@ -66,8 +67,9 @@ class NominatimRateLimiter {
 			return cached;
 		}
 
-		// If there's a pending request for the same URL, wait for it
-		if (this.pendingRequest && this.pendingRequest.url === url) {
+		// If there's a pending request for the same endpoint+params, wait for it
+		const requestKey = `${endpoint}:${JSON.stringify(params)}`;
+		if (this.pendingRequest && this.pendingRequest.key === requestKey) {
 			return this.pendingRequest.promise;
 		}
 
@@ -92,9 +94,8 @@ class NominatimRateLimiter {
 				this.lastRequestTime = Date.now();
 
 				const fetchOptions = {
-					headers: {
-						'User-Agent': 'WordPress-NewOSM-Plugin/1.0',
-					},
+					path: `${endpoint}?${new URLSearchParams(params).toString()}`,
+					method: 'GET',
 				};
 
 				// Add signal if provided
@@ -102,35 +103,28 @@ class NominatimRateLimiter {
 					fetchOptions.signal = signal;
 				}
 
-				const response = await fetch(url, fetchOptions);
-
-				// Handle rate limiting
-				if (response.status === 429) {
-					const retryAfter = response.headers.get('Retry-After');
-					const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 2000;
-					throw new Error(`Rate limited. Please wait ${Math.ceil(waitTime / 1000)} seconds before trying again.`);
-				}
-
-				if (!response.ok) {
-					throw new Error(`HTTP error! status: ${response.status}`);
-				}
-
-				const data = await response.json();
+				const data = await apiFetch(fetchOptions);
 
 				// Cache the result
 				this.setCache(cacheKey, data);
 
 				return data;
+			} catch (error) {
+				// Handle rate limiting
+				if (error.data && error.data.status === 429) {
+					throw new Error('Rate limited. Please wait a moment before trying again.');
+				}
+				throw error;
 			} finally {
 				// Clear pending request
-				if (this.pendingRequest && this.pendingRequest.url === url) {
+				if (this.pendingRequest && this.pendingRequest.key === requestKey) {
 					this.pendingRequest = null;
 				}
 			}
 		})();
 
 		// Store as pending request
-		this.pendingRequest = { url, promise };
+		this.pendingRequest = { key: requestKey, promise };
 
 		return promise;
 	}
@@ -141,8 +135,7 @@ class NominatimRateLimiter {
 	 * @param {AbortSignal} signal - Optional AbortController signal for request cancellation
 	 */
 	async search(query, signal = null) {
-		const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
-		return this.request(url, signal);
+		return this.request('/newopm/v1/nominatim/search', { q: query }, signal);
 	}
 
 	/**
@@ -152,8 +145,7 @@ class NominatimRateLimiter {
 	 * @param {AbortSignal} signal - Optional AbortController signal for request cancellation
 	 */
 	async reverse(lat, lon, signal = null) {
-		const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
-		return this.request(url, signal);
+		return this.request('/newopm/v1/nominatim/reverse', { lat, lon }, signal);
 	}
 }
 
