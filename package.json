@@ -10,7 +10,8 @@
   },
   "devDependencies": {
     "@wordpress/scripts": "^19.2.4",
-    "copy-webpack-plugin": "^13.0.1"
+    "copy-webpack-plugin": "^13.0.1",
+    "postcss-nesting": "^14.0.0"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

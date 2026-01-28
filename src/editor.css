@@ -1,0 +1,145 @@
+/**
+ * Editor-specific styles for the NewOSM block
+ */
+
+.wp-block-newopm-osm-map .newopm-map-container {
+	width: 100%;
+	border: 2px solid #ddd;
+	border-radius: 4px;
+	overflow: hidden;
+	position: relative;
+}
+
+/* Selected state */
+.wp-block-newopm-osm-map.is-selected .newopm-map-container {
+	border-color: #007cba;
+	box-shadow: 0 0 0 1px #007cba;
+}
+
+@scope (.newopm-map-container) {
+	:scope {
+		/* Override leaflet.fullscreen plugin default icons with darker versions */
+		--fullscreen-icon-enter: url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjYgMjYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZmlsbD0iIzAwMCIgZD0iTTUgMTAuM1Y1LjljMC0uNS40LS45LjktLjloNC40Yy4yIDAgLjQuMi40LjRWN2MwIC4yLS4yLjQtLjQuNGgtM3YzYzAgLjItLjIuNC0uNC40SDUuNGEuNC40IDAgMCAxLS40LS40em0xMC4zLTQuOVY3YzAgLjIuMi40LjQuNGgzdjNjMCAuMi4yLjQuNC40aDEuNWMuMiAwIC40LS4yLjQtLjRWNS45YzAtLjUtLjQtLjktLjktLjloLTQuNGMtLjIgMC0uNC4yLS40LjR6bTUuMyA5LjlIMTljLS4yIDAtLjQuMi0uNC40djNoLTNjLS4yIDAtLjQuMi0uNC40djEuNWMwIC4yLjIuNC40LjRoNC40Yy41IDAgLjktLjQuOS0uOXYtNC40YzAtLjItLjItLjQtLjQtLjR6bS05LjkgNS4zVjE5YzAtLjItLjItLjQtLjQuNGgtM3YtM2MwLS4yLS4yLS40LS40LS40SDUuNGEuMiAwLS40LjIuNC40djQuNGMwIC41LjQuOS45LjloNC40Yy4yIDAgLjQtLjIuNC0uNHoiLz48L3N2Zz4=');
+		--fullscreen-icon-exit: url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjYgMjYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZmlsbD0iIzAwMCIgZD0iTTIwLjYgMTAuN0gxNmEuOS45IDAgMCAxLS44LS44di00LjVjMC0uMi4yLS40LjQtLjRoMS40Yy4zIDAgLjUuMi41LjR2M2gzYy4yIDAgLjQuMi40LjV2MS40YzAgLjItLjIuNC0uNC40em0tOS45LS44VjUuNGMwLS4yLS4yLS40LS40LS40SDguOWMtLjMgMC0uNS4yLS41LjR2M2gtM2MtLjIgMC0uNC4yLS40LjV2MS40YzAgLjIuMi40LjQuNEg5LjljLjQgMCAuOC0uNC44LS44em0wIDEwLjdWMTZjMC0uNC0uNC0uOC0uOC0uOEg1LjRjLS4yIDAtLjQuMi0uNC40djEuNGMwIC4zLjIuNS40LjVoM3YzYzAgLjIuMi40LjUuNGgxLjRjLjIgMCAuNC0uMi40LS40em02LjkgMHYtM2gzYy4yIDAgLjQtLjIuNC0uNXYtMS40YzAtLjItLjItLjQtLjQtLjRIMTZjLS40IDAtLjguNC0uOC44djQuNWMwIC4yLjIuNC40LjRoMS41Yy4zIDAgLjUtLjIuNS0uNHoiLz48L3N2Zz4=');
+	}
+
+	.leaflet-container {
+		font-family:
+			-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue',
+			sans-serif;
+		position: relative;
+		overflow: hidden;
+		user-select: none;
+		-webkit-user-select: none;
+		-moz-user-select: none;
+		-ms-user-select: none;
+	}
+
+	img.leaflet-tile {
+		max-width: none;
+		max-height: none;
+		width: 256px;
+		height: 256px;
+		margin: 0;
+		padding: 0;
+		border: none;
+		box-sizing: content-box;
+		object-fit: fill;
+		display: block;
+		position: absolute;
+	}
+
+	.leaflet-tile-pane,
+	.leaflet-map-pane,
+	.leaflet-pane {
+		position: absolute;
+	}
+
+	/* Map controls in editor */
+	.leaflet-control-zoom {
+		margin-top: 10px;
+		margin-left: 10px;
+	}
+
+	.leaflet-bar a {
+		color: #333;
+	}
+
+	.leaflet-control-fullscreen a {
+		background-color: white;
+		border: 2px solid rgba(0, 0, 0, 0.3);
+		color: #000;
+	}
+
+	.leaflet-control-fullscreen a:hover {
+		background-color: #f4f4f4;
+		border-color: rgba(0, 0, 0, 0.4);
+	}
+
+	/* Fullscreen styles */
+	:scope:fullscreen,
+	:scope:-webkit-full-screen,
+	:scope:-moz-full-screen,
+	:scope:-ms-fullscreen {
+		width: 100vw;
+		height: 100vh;
+		border: none;
+		border-radius: 0;
+	}
+
+	:scope:fullscreen .leaflet-container,
+	:scope:-webkit-full-screen .leaflet-container,
+	:scope:-moz-full-screen .leaflet-container,
+	:scope:-ms-fullscreen .leaflet-container {
+		width: 100%;
+		height: 100%;
+	}
+}
+
+/* Inspector panel customizations */
+.components-panel__body .components-base-control__field {
+	margin-bottom: 16px;
+}
+
+.components-panel__body button.components-button.is-primary {
+	justify-content: center;
+}
+
+/* Loading spinner animation */
+@keyframes newopm-spin {
+	0% {
+		transform: rotate(0deg);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
+}
+
+.newopm-spinner {
+	animation: newopm-spin 1s linear infinite;
+}
+
+/* Screen reader only text (visually hidden but accessible) */
+.sr-only,
+.screen-reader-text {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.sr-only:focus,
+.screen-reader-text:focus {
+	position: static;
+	width: auto;
+	height: auto;
+	margin: 0;
+	overflow: visible;
+	clip: auto;
+	white-space: normal;
+}

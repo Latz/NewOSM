@@ -9,7 +9,10 @@
       "Bash(npm install:*)",
       "Bash(npm audit:*)",
       "Bash(git tag:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "WebSearch",
+      "Bash(ls:*)",
+      "Bash(git add:*)"
     ]
   }
 }
