@@ -9,6 +9,7 @@ import { FullScreen } from 'leaflet.fullscreen';
 import 'leaflet.fullscreen/dist/Control.FullScreen.css';
 import { applySVGMarkerIcons } from './utils/markerIcons';
 import { getFrontendTileConfig } from './utils/devicePerformance';
+import { registerServiceWorker } from './utils/swRegistration';
 
 // Apply SVG marker icons to eliminate HTTP requests for PNG files
 // See FUTURE_OPTIMIZATIONS.md #5 - Optimize Marker Icons
@@ -17,6 +18,22 @@ applySVGMarkerIcons(L);
 // Get optimal tile configuration based on device performance
 // See FUTURE_OPTIMIZATIONS.md #3 - Virtualize Tile Rendering
 const tileConfig = getFrontendTileConfig();
+
+// Register Service Worker for tile caching
+// Enables cache-first strategy for OSM tiles, offline map support, and persistent cache
+if (typeof window !== 'undefined') {
+	const registerSW = () => {
+		const pluginUrl = window.newOpmData?.pluginUrl || '';
+		const swPath = pluginUrl + 'build/service-worker.js';
+		registerServiceWorker(swPath);
+	};
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', registerSW);
+	} else {
+		registerSW();
+	}
+}
 
 // Store map instances and cleanup functions for proper disposal
 const mapInstances = new WeakMap(); // Maps DOM elements to { map, cleanup }

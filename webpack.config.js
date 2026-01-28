@@ -26,7 +26,7 @@ module.exports = {
 		maxEntrypointSize: 512000, // 500kb
 		maxAssetSize: 512000, // 500kb
 	},
-	// Copy block.json to build directory
+	// Copy static assets to build directory
 	plugins: [
 		...defaultConfig.plugins,
 		new CopyWebpackPlugin({
@@ -34,6 +34,10 @@ module.exports = {
 				{
 					from: path.resolve(process.cwd(), 'src', 'block.json'),
 					to: path.resolve(process.cwd(), 'build', 'block.json'),
+				},
+				{
+					from: path.resolve(process.cwd(), 'src', 'service-worker.js'),
+					to: path.resolve(process.cwd(), 'build', 'service-worker.js'),
 				},
 			],
 		}),
