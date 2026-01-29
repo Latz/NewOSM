@@ -137,6 +137,78 @@ function newopm_register_block() {
 add_action('init', 'newopm_register_block');
 
 /**
+ * Enqueue vendor chunks manually to ensure correct load order
+ *
+ * WordPress's automatic script registration may not detect vendor chunks
+ * created by webpack code splitting. This function ensures leaflet-vendor.js
+ * loads before view.js and editor scripts.
+ *
+ * Vendor chunks are extracted by webpack's splitChunks configuration to:
+ * 1. Reduce bundle size by eliminating Leaflet duplication
+ * 2. Improve caching (vendor chunk cached separately)
+ * 3. Speed up page loads (less JavaScript to parse)
+ *
+ * @since 1.2.0
+ * @return void
+ */
+function newopm_enqueue_vendor_chunks() {
+	// Check if vendor chunk exists
+	$vendor_asset_file = NEWOPM_PLUGIN_DIR . 'build/leaflet-vendor.asset.php';
+
+	if (!file_exists($vendor_asset_file)) {
+		// No vendor chunk (might be development build without splitChunks), skip gracefully
+		if (defined('WP_DEBUG') && WP_DEBUG) {
+			error_log('NewOSM: Vendor chunk not found - tree shaking optimization inactive');
+		}
+		return;
+	}
+
+	$vendor_asset = include($vendor_asset_file);
+	$vendor_handle = 'newopm-leaflet-vendor';
+
+	// Register vendor chunk as a WordPress script
+	wp_register_script(
+		$vendor_handle,
+		NEWOPM_PLUGIN_URL . 'build/leaflet-vendor.js',
+		$vendor_asset['dependencies'] ?? [],
+		$vendor_asset['version'] ?? NEWOPM_VERSION,
+		true // Load in footer
+	);
+
+	// Force HTTPS if needed
+	if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+		global $wp_scripts;
+		if (isset($wp_scripts->registered[$vendor_handle])) {
+			$wp_scripts->registered[$vendor_handle]->src =
+				str_replace('http://', 'https://', $wp_scripts->registered[$vendor_handle]->src);
+		}
+	}
+
+	// Use script_loader_tag filter to auto-enqueue vendor chunk when dependent scripts load
+	// This ensures WordPress loads leaflet-vendor.js BEFORE view.js and editor scripts
+	add_filter('script_loader_tag', function($tag, $handle, $src) use ($vendor_handle) {
+		// Auto-enqueue vendor chunk when frontend view script loads
+		if ($handle === 'newopm-osm-map-view-script') {
+			if (!wp_script_is($vendor_handle, 'enqueued')) {
+				wp_enqueue_script($vendor_handle);
+			}
+		}
+		// Auto-enqueue vendor chunk when editor script loads
+		if ($handle === 'newopm-osm-map-editor-script') {
+			if (!wp_script_is($vendor_handle, 'enqueued')) {
+				wp_enqueue_script($vendor_handle);
+			}
+		}
+		return $tag;
+	}, 10, 3);
+
+	if (defined('WP_DEBUG') && WP_DEBUG) {
+		error_log('NewOSM: Vendor chunk registered - ' . $vendor_handle);
+	}
+}
+add_action('init', 'newopm_enqueue_vendor_chunks', 5); // Priority 5, before block registration at 10
+
+/**
  * Localize script data for the block editor
  *
  * Passes PHP data to JavaScript, including the plugin URL for asset paths.

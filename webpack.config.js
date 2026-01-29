@@ -14,9 +14,37 @@ module.exports = {
 	// Optimization configuration
 	optimization: {
 		...defaultConfig.optimization,
-		// Disable code splitting for WordPress compatibility
-		// WordPress block registration doesn't automatically handle split chunks
-		splitChunks: false,
+		// Enable tree shaking to remove unused exports
+		usedExports: true,
+		// Selective code splitting for vendor libraries only
+		// Leaflet and react-leaflet are extracted to a shared chunk to eliminate duplication
+		splitChunks: {
+			cacheGroups: {
+				// Preserve @wordpress/scripts default CSS splitting
+				style: {
+					type: 'css/mini-extract',
+					test: /[\\/]style(\.module)?\.(sc|sa|c)ss$/,
+					chunks: 'all',
+					enforce: true,
+					name(module, chunks, cacheGroupKey) {
+						return `${cacheGroupKey}-${chunks[0].name}`;
+					},
+				},
+				// Extract Leaflet vendor libraries to shared chunk
+				// This eliminates ~145KB duplicate Leaflet from view.js and 464.js
+				leafletVendor: {
+					test: /[\\/]node_modules[\\/](leaflet|react-leaflet|leaflet\.fullscreen)/,
+					name: 'leaflet-vendor',
+					chunks: 'all',
+					priority: 20, // Higher priority than default
+					reuseExistingChunk: true,
+					enforce: true,
+				},
+				// Disable default splitting to maintain WordPress compatibility
+				default: false,
+				defaultVendors: false,
+			},
+		},
 		// Minimize only in production
 		minimize: process.env.NODE_ENV === 'production',
 	},

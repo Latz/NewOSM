@@ -8,6 +8,12 @@
     "test": "wp-scripts test-unit-js",
     "test:watch": "wp-scripts test-unit-js --watch"
   },
+  "sideEffects": [
+    "*.css",
+    "*.scss",
+    "src/utils/markerIcons.js",
+    "src/service-worker.js"
+  ],
   "devDependencies": {
     "@wordpress/scripts": "^19.2.4",
     "copy-webpack-plugin": "^13.0.1",
