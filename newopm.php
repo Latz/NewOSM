@@ -250,7 +250,6 @@ function newopm_localize_editor_script() {
             'newOpmData',
             array(
                 'pluginUrl' => NEWOPM_PLUGIN_URL,
-                'pluginDir' => NEWOPM_PLUGIN_DIR,
                 'version' => NEWOPM_VERSION,
             )
         );
@@ -330,7 +329,6 @@ function newopm_localize_frontend_script() {
                 'newOpmData',
                 array(
                     'pluginUrl' => NEWOPM_PLUGIN_URL,
-                    'pluginDir' => NEWOPM_PLUGIN_DIR,
                     'version' => NEWOPM_VERSION,
                 )
             );
