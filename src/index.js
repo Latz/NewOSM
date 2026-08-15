@@ -6,7 +6,7 @@ import './editor.css';
 
 console.log('NewOSM: Attempting to register block', metadata.name);
 
-const registeredBlock = registerBlockType(metadata.name, {
+const registeredBlock = registerBlockType(metadata, {
 	edit: Edit,
 	save,
 });
