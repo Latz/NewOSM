@@ -15,3 +15,6 @@ coverage/
 /CHANGELOG.md
 /FIXES_APPLIED.md
 /.claude/settings.local.json
+
+# Personal working memory (Total Recall)
+CLAUDE.local.md

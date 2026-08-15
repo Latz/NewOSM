@@ -9,10 +9,16 @@
       "Bash(npm install:*)",
       "Bash(npm audit:*)",
       "Bash(git tag:*)",
-      "Bash(git commit:*)",
-      "WebSearch",
+      "Bash(git -C /home/latz/docker/wp/wp/wp-content/plugins/NewOSM diff ce9c739650cc95b60ea8967e4cd30c87d9a2908a f5b4a0f188e4320bf308dbff33105aae0f6ba7fb --name-only)",
       "Bash(ls:*)",
-      "Bash(git add:*)"
+      "Bash(git -C /home/latz/docker/wp/wp/wp-content/plugins/NewOSM status)",
+      "Bash(git -C /home/latz/docker/wp/wp/wp-content/plugins/NewOSM diff newopm.php)",
+      "Bash(git -C /home/latz/docker/wp/wp/wp-content/plugins/NewOSM add newopm.php)",
+      "Bash(git -C:*)",
+      "Bash(php:*)",
+      "Bash(composer:*)",
+      "WebFetch(domain:packagist.org)",
+      "Bash(vendor/bin/phpunit:*)"
     ]
   }
 }
