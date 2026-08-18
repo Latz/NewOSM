@@ -1,0 +1,13 @@
+{
+  "REST_NAMESPACE": "newopm/v1",
+  "ROUTES": {
+    "DEFAULTS": "/defaults",
+    "NOMINATIM_SEARCH": "/nominatim/search",
+    "NOMINATIM_REVERSE": "/nominatim/reverse"
+  },
+  "WP_ENV": {
+    "BASE_URL": "http://localhost:8888",
+    "ADMIN_USER": "admin",
+    "ADMIN_PASSWORD": "password"
+  }
+}

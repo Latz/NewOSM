@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+    bootstrap="tests/bootstrap-unit.php"
+    colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Integration">
+            <directory>tests/Integration</directory>
+            <!-- Override bootstrap: pass -bootstrap tests/bootstrap-integration.php to pest CLI -->
+        </testsuite>
+    </testsuites>
+
+    <source>
+        <include>
+            <file>newopm.php</file>
+        </include>
+    </source>
+</phpunit>

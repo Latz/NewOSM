@@ -1,0 +1,25 @@
+{
+    "name": "latz/newopm",
+    "description": "NewOSM WordPress plugin – OpenStreetMap Gutenberg block",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=8.0"
+    },
+    "require-dev": {
+        "pestphp/pest": "^4.0",
+        "brain/monkey": "^2.7",
+        "yoast/phpunit-polyfills": "^4.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "scripts": {
+        "test": "pest --testsuite=Unit",
+        "test:unit": "pest --testsuite=Unit",
+        "test:integration": "pest --testsuite=Integration --bootstrap tests/bootstrap-integration.php",
+        "test:integration:multisite": "pest -c tests/phpunit/multisite.xml"
+    }
+}
