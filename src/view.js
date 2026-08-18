@@ -7,7 +7,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { FullScreen } from 'leaflet.fullscreen';
 import 'leaflet.fullscreen/dist/Control.FullScreen.css';
-import { applySVGMarkerIcons } from './utils/markerIcons';
+import { applySVGMarkerIcons, createMarkerIcon } from './utils/markerIcons';
 import { getFrontendTileConfig } from './utils/devicePerformance';
 import { registerServiceWorker } from './utils/swRegistration';
 
@@ -119,6 +119,8 @@ function initializeNewOpmMaps() {
 		const markerLat = parseFloat(mapElement.getAttribute('data-marker-lat'));
 		const markerLon = parseFloat(mapElement.getAttribute('data-marker-lon'));
 		const markerLabel = mapElement.getAttribute('data-marker-label');
+		const isMultimarker = mapElement.getAttribute('data-multimarker') === 'true';
+		const markersJson = mapElement.getAttribute('data-markers');
 
 		// Validate coordinates
 		if (isNaN(lat) || isNaN(lon) || isNaN(zoom)) {
@@ -174,12 +176,44 @@ function initializeNewOpmMaps() {
 				minZoom: 2,
 			}).addTo(map);
 
-			// Add marker if coordinates are present
-			if (!isNaN(markerLat) && !isNaN(markerLon)) {
-				const marker = L.marker([markerLat, markerLon]).addTo(map);
-				if (markerLabel) {
-					marker.bindPopup(markerLabel);
+			// Add marker(s) if present - either the legacy single marker, or (when
+			// multimarker mode is enabled) the JSON-encoded markers list
+			if (!isMultimarker) {
+				if (!isNaN(markerLat) && !isNaN(markerLon)) {
+					const marker = L.marker([markerLat, markerLon]).addTo(map);
+					if (markerLabel) {
+						marker.bindPopup(markerLabel);
+					}
 				}
+			} else if (markersJson) {
+				let parsedMarkers = [];
+				try {
+					parsedMarkers = JSON.parse(markersJson);
+				} catch (error) {
+					console.error('NewOSM: Invalid markers JSON', error);
+				}
+
+				parsedMarkers.forEach(function (m) {
+					if (typeof m.lat !== 'number' || typeof m.lon !== 'number' || isNaN(m.lat) || isNaN(m.lon)) {
+						return;
+					}
+
+					const icon = createMarkerIcon({ color: m.color, markerId: m.id });
+					const marker = L.marker([m.lat, m.lon], { icon }).addTo(map);
+
+					if (m.label) {
+						// Build popup content via textContent, never innerHTML, so a marker
+						// label can never inject markup/scripts into the page
+						const popupEl = document.createElement('div');
+						popupEl.className = 'newopm-marker-popup-frontend';
+						popupEl.textContent = m.label;
+						marker.bindPopup(popupEl);
+					}
+
+					cleanupFunctions.push(function () {
+						map.removeLayer(marker);
+					});
+				});
 			}
 
 			// Add leaflet.fullscreen plugin control

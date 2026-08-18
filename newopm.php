@@ -165,6 +165,7 @@ function newopm_enqueue_vendor_chunks() {
 
 	$vendor_asset = include($vendor_asset_file);
 	$vendor_handle = 'newopm-leaflet-vendor';
+	$vendor_style_handle = 'newopm-leaflet-vendor-style';
 
 	// Register vendor chunk as a WordPress script
 	wp_register_script(
@@ -175,17 +176,44 @@ function newopm_enqueue_vendor_chunks() {
 		true // Load in footer
 	);
 
+	// Register the vendor CSS chunk (Leaflet's own base styles, split out by
+	// webpack's leafletVendor cache group alongside the JS). Without this,
+	// Leaflet's own `.leaflet-container img { max-width: none !important }`
+	// protection never loads, and a theme/editor default like
+	// `img { max-width: 100% }` silently collapses every marker icon to
+	// zero width inside its (unsized) marker pane - no error, no visible
+	// marker.
+	$vendor_css_file = NEWOPM_PLUGIN_DIR . 'build/leaflet-vendor.css';
+	if (file_exists($vendor_css_file)) {
+		wp_register_style(
+			$vendor_style_handle,
+			NEWOPM_PLUGIN_URL . 'build/leaflet-vendor.css',
+			[],
+			$vendor_asset['version'] ?? NEWOPM_VERSION
+		);
+	}
+
 	// Force HTTPS if needed
 	if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
-		global $wp_scripts;
+		global $wp_scripts, $wp_styles;
 		if (isset($wp_scripts->registered[$vendor_handle])) {
 			$wp_scripts->registered[$vendor_handle]->src =
 				str_replace('http://', 'https://', $wp_scripts->registered[$vendor_handle]->src);
 		}
+		if (isset($wp_styles->registered[$vendor_style_handle])) {
+			$wp_styles->registered[$vendor_style_handle]->src =
+				str_replace('http://', 'https://', $wp_styles->registered[$vendor_style_handle]->src);
+		}
 	}
 
 	// Use script_loader_tag filter to auto-enqueue vendor chunk when dependent scripts load
-	// This ensures WordPress loads leaflet-vendor.js BEFORE view.js and editor scripts
+	// This ensures WordPress loads leaflet-vendor.js BEFORE view.js and editor scripts.
+	// (CSS is NOT enqueued from here - by the time scripts print, in the footer,
+	// wp_head's style-printing pass has already run, so a style enqueued this
+	// late would never actually output a <link> tag. The vendor CSS is instead
+	// enqueued directly from newopm_localize_editor_script()/
+	// newopm_localize_frontend_script(), which already run on the correct
+	// enqueue_block_editor_assets/wp_enqueue_scripts hooks.)
 	add_filter('script_loader_tag', function($tag, $handle, $src) use ($vendor_handle) {
 		// Auto-enqueue vendor chunk when frontend view script loads
 		if ($handle === 'newopm-osm-map-view-script') {
@@ -261,8 +289,58 @@ function newopm_localize_editor_script() {
             error_log('NewOSM: Script NOT registered, cannot localize');
         }
     }
+
+    // Leaflet's own base CSS (registered by newopm_enqueue_vendor_chunks() on
+    // 'init') must be enqueued here - not from a script-print-time filter -
+    // so it actually makes it into the editor's <head> style output. Without
+    // it, Leaflet's `.leaflet-container img { max-width: none !important }`
+    // rule never loads, and the editor's own default `img { max-width: 100% }`
+    // style silently collapses every marker icon to zero width.
+    if (wp_style_is('newopm-leaflet-vendor-style', 'registered')) {
+        wp_enqueue_style('newopm-leaflet-vendor-style');
+    }
 }
 add_action('enqueue_block_editor_assets', 'newopm_localize_editor_script', 20);
+
+/**
+ * Inline Leaflet's own base CSS into the block editor's iframe
+ *
+ * The block editor canvas renders inside a separate iframe with its own
+ * document/head. WordPress automatically mirrors a block's block.json
+ * `editorStyle` into that iframe, but a plain wp_enqueue_style() call
+ * (like the one in newopm_localize_editor_script() above, needed for the
+ * top-level admin page) is never copied over - the iframe only picks up
+ * styles listed in `styles` here. Without Leaflet's own
+ * `.leaflet-container img { max-width: none !important }` rule loaded
+ * inside the iframe specifically, the editor's default `img { max-width:
+ * 100% }` style collapses every marker icon to zero width, even though
+ * the marker element itself is created correctly.
+ *
+ * @since 1.2.0
+ * @param array $settings Block editor settings.
+ * @return array Modified settings.
+ */
+function newopm_add_vendor_css_to_editor_iframe($settings) {
+    $vendor_css_file = NEWOPM_PLUGIN_DIR . 'build/leaflet-vendor.css';
+
+    if (!file_exists($vendor_css_file)) {
+        return $settings;
+    }
+
+    $css = file_get_contents($vendor_css_file);
+    if ($css === false) {
+        return $settings;
+    }
+
+    if (!isset($settings['styles']) || !is_array($settings['styles'])) {
+        $settings['styles'] = [];
+    }
+
+    $settings['styles'][] = ['css' => $css];
+
+    return $settings;
+}
+add_filter('block_editor_settings_all', 'newopm_add_vendor_css_to_editor_iframe');
 
 /**
  * Debug: Check what scripts are actually enqueued
@@ -332,6 +410,12 @@ function newopm_localize_frontend_script() {
                     'version' => NEWOPM_VERSION,
                 )
             );
+        }
+
+        // Leaflet's own base CSS - see the matching comment in
+        // newopm_localize_editor_script() for why this must load here.
+        if (wp_style_is('newopm-leaflet-vendor-style', 'registered')) {
+            wp_enqueue_style('newopm-leaflet-vendor-style');
         }
     }
 }

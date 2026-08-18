@@ -1,8 +1,17 @@
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from '@wordpress/element';
 import { InspectorControls, useBlockProps } from '@wordpress/block-editor';
-import { PanelBody, TextControl, RangeControl, Button, SelectControl, Spinner } from '@wordpress/components';
+import {
+	PanelBody,
+	TextControl,
+	RangeControl,
+	Button,
+	SelectControl,
+	Spinner,
+	ToggleControl,
+	__experimentalConfirmDialog as ConfirmDialog,
+} from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import { dispatch } from '@wordpress/data';
 import 'leaflet/dist/leaflet.css';
 
@@ -160,9 +169,39 @@ const SIZE_PRESETS = {
 	fullscreen: { width: '100%', height: 800 },
 };
 
+/**
+ * Generate a locally-unique id for a new multimarker marker entry.
+ */
+function generateMarkerId() {
+	return `m-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 // Custom pan handler that doesn't get stuck
 export default function Edit({ attributes, setAttributes, isSelected }) {
-	const { latitude, longitude, zoom, markerLat, markerLon, markerLabel, height, width, sizePreset, mapId } = attributes;
+	const {
+		latitude,
+		longitude,
+		zoom,
+		markerLat,
+		markerLon,
+		markerLabel,
+		multimarker,
+		markers,
+		height,
+		width,
+		sizePreset,
+		mapId,
+	} = attributes;
+	const [openPopupMarkerId, setOpenPopupMarkerId] = useState(null);
+	const [isMultimarkerConfirmOpen, setIsMultimarkerConfirmOpen] = useState(false);
+
+	// Kept in sync with the `markers` attribute so multimarker handlers can read/write
+	// the latest array synchronously (avoids races between rapid consecutive edits and
+	// React's async setAttributes/re-render cycle).
+	const markersRef = useRef(markers || []);
+	useEffect(() => {
+		markersRef.current = markers || [];
+	}, [markers]);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [isSearching, setIsSearching] = useState(false);
 	const [useCustomSize, setUseCustomSize] = useState(sizePreset === 'custom');
@@ -406,6 +445,180 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 		[setAttributes]
 	);
 
+	// --- Multimarker: per-marker state updates + debounced reverse geocoding ---
+	// Mirrors the single-marker fetchAddress logic above, but keyed by marker id and
+	// writing into the `markers` array instead of the singular markerLat/markerLon/markerLabel
+	// attributes. Kept separate from fetchAddress (rather than a single generalized function)
+	// to avoid any risk of regressing the existing, already-working single-marker path.
+	const reverseGeocodeTimeoutsById = useRef({});
+	const lastReverseGeocodeTimesById = useRef({});
+	const reverseGeocodeAbortControllersById = useRef({});
+
+	/**
+	 * Immutably update one marker's fields (by id) in the `markers` attribute.
+	 * @param {string} markerId
+	 * @param {Object} fields - Partial marker fields to merge, e.g. { lat, lon, label }
+	 */
+	const updateMarkerFields = useCallback(
+		(markerId, fields) => {
+			const next = markersRef.current.map(m => (m.id === markerId ? { ...m, ...fields } : m));
+			markersRef.current = next;
+			setAttributes({ markers: next });
+		},
+		[setAttributes]
+	);
+
+	/**
+	 * Debounced reverse-geocode for a single multimarker marker; sets coordinates
+	 * immediately, then replaces the label with the resolved address once available.
+	 * @param {string} markerId
+	 * @param {number} lat
+	 * @param {number} lon
+	 */
+	const fetchAddressForMarker = useCallback(
+		(markerId, lat, lon) => {
+			const coordLabel = `Lat: ${lat.toFixed(5)}, Lon: ${lon.toFixed(5)}`;
+			updateMarkerFields(markerId, { lat, lon, label: coordLabel });
+
+			if (reverseGeocodeAbortControllersById.current[markerId]) {
+				reverseGeocodeAbortControllersById.current[markerId].abort();
+			}
+			if (reverseGeocodeTimeoutsById.current[markerId]) {
+				clearTimeout(reverseGeocodeTimeoutsById.current[markerId]);
+			}
+
+			const now = Date.now();
+			const timeSinceLastRequest = now - (lastReverseGeocodeTimesById.current[markerId] || 0);
+			const isRapidChange = timeSinceLastRequest < 500;
+			const debounceDelay = isRapidChange ? 1000 : 200;
+			lastReverseGeocodeTimesById.current[markerId] = now;
+
+			reverseGeocodeTimeoutsById.current[markerId] = setTimeout(async () => {
+				const controller = new AbortController();
+				reverseGeocodeAbortControllersById.current[markerId] = controller;
+
+				try {
+					const data = await nominatimAPI.reverse(lat, lon, controller.signal);
+					if (data && data.display_name) {
+						updateMarkerFields(markerId, { lat, lon, label: data.display_name });
+					}
+				} catch (error) {
+					if (error.name === 'AbortError') {
+						return;
+					}
+					console.error('Reverse geocoding error:', error);
+				}
+			}, debounceDelay);
+		},
+		[updateMarkerFields]
+	);
+
+	/**
+	 * @listens MapEditor#onMapClick (multimarker mode) - adds a new marker at the clicked point
+	 */
+	const handleMapClickMulti = useCallback(
+		latlng => {
+			const timeSinceSelection = Date.now() - selectionTimeRef.current;
+			if (timeSinceSelection < 150) {
+				return;
+			}
+			if (!isSelectedRef.current) {
+				return;
+			}
+
+			const newId = generateMarkerId();
+			const nextMarkers = [...markersRef.current, { id: newId, lat: latlng.lat, lon: latlng.lng, label: '', color: 'blue' }];
+			markersRef.current = nextMarkers;
+			setAttributes({ markers: nextMarkers });
+			fetchAddressForMarker(newId, latlng.lat, latlng.lng);
+		},
+		[setAttributes, fetchAddressForMarker]
+	);
+
+	/**
+	 * @listens MapEditor#onMarkerDragEnd (multimarker mode) - re-geocodes after a marker is moved
+	 */
+	const handleMarkerDragEndMulti = useCallback(
+		(markerId, latlng) => {
+			fetchAddressForMarker(markerId, latlng.lat, latlng.lng);
+		},
+		[fetchAddressForMarker]
+	);
+
+	/**
+	 * @listens MapEditor#onMarkerClick (multimarker mode) - toggles that marker's options popup
+	 */
+	const handleMarkerClick = useCallback(markerId => {
+		setOpenPopupMarkerId(current => (current === markerId ? null : markerId));
+	}, []);
+
+	const handleMarkerLabelChange = useCallback(
+		(markerId, label) => {
+			updateMarkerFields(markerId, { label });
+		},
+		[updateMarkerFields]
+	);
+
+	const handleMarkerColorChange = useCallback(
+		(markerId, color) => {
+			updateMarkerFields(markerId, { color });
+		},
+		[updateMarkerFields]
+	);
+
+	const handleMarkerDelete = useCallback(
+		markerId => {
+			const next = markersRef.current.filter(m => m.id !== markerId);
+			markersRef.current = next;
+			setAttributes({ markers: next });
+			setOpenPopupMarkerId(current => (current === markerId ? null : current));
+
+			if (reverseGeocodeTimeoutsById.current[markerId]) {
+				clearTimeout(reverseGeocodeTimeoutsById.current[markerId]);
+				delete reverseGeocodeTimeoutsById.current[markerId];
+			}
+			if (reverseGeocodeAbortControllersById.current[markerId]) {
+				reverseGeocodeAbortControllersById.current[markerId].abort();
+				delete reverseGeocodeAbortControllersById.current[markerId];
+			}
+			delete lastReverseGeocodeTimesById.current[markerId];
+		},
+		[setAttributes]
+	);
+
+	/**
+	 * @listens ToggleControl#onChange - toggles multimarker mode; auto-migrates an existing
+	 * legacy single marker into `markers[0]` the first time it's switched on, so it isn't lost.
+	 */
+	const handleMultimarkerToggle = useCallback(
+		value => {
+			if (value && markersRef.current.length === 0 && typeof markerLat === 'number' && typeof markerLon === 'number') {
+				const migrated = [{ id: generateMarkerId(), lat: markerLat, lon: markerLon, label: markerLabel, color: 'blue' }];
+				markersRef.current = migrated;
+				setAttributes({ multimarker: value, markers: migrated });
+			} else if (!value && markersRef.current.length > 0) {
+				// Warn via WP's ConfirmDialog that the map will visually lose its markers.
+				// Actual disabling (and whether `markers` survives) happens in the dialog's
+				// onConfirm/onCancel handlers below.
+				setIsMultimarkerConfirmOpen(true);
+			} else {
+				setAttributes({ multimarker: value });
+			}
+		},
+		[setAttributes, markerLat, markerLon, markerLabel]
+	);
+
+	const handleConfirmDisableMultimarker = useCallback(() => {
+		setIsMultimarkerConfirmOpen(false);
+		// `markers` is deliberately left untouched - it stays in the block's saved
+		// attributes so every marker silently reappears if multimarker is re-enabled.
+		setAttributes({ multimarker: false });
+	}, [setAttributes]);
+
+	const handleCancelDisableMultimarker = useCallback(() => {
+		setIsMultimarkerConfirmOpen(false);
+	}, []);
+
 	// Cleanup debounce timeouts and abort controllers on unmount
 	useEffect(() => {
 		return () => {
@@ -421,6 +634,8 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 			if (centerTimeoutRef.current) {
 				clearTimeout(centerTimeoutRef.current);
 			}
+			Object.values(reverseGeocodeTimeoutsById.current).forEach(clearTimeout);
+			Object.values(reverseGeocodeAbortControllersById.current).forEach(controller => controller.abort());
 		};
 	}, []);
 
@@ -448,6 +663,20 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 			fetchAddress(latlng.lat, latlng.lng);
 		},
 		[fetchAddress]
+	);
+
+	/**
+	 * @listens MapEditor#onMapClick - branches to single- or multi-marker placement
+	 */
+	const handleMapClickCombined = useCallback(
+		latlng => {
+			if (multimarker) {
+				handleMapClickMulti(latlng);
+			} else {
+				handleMapClick(latlng);
+			}
+		},
+		[multimarker, handleMapClickMulti, handleMapClick]
 	);
 
 	// Debounce zoom changes to reduce attribute updates during zoom animation
@@ -600,6 +829,14 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 						</Button>
 					</div>
 
+					<ToggleControl
+						label={__('Multimarker', 'newopm')}
+						checked={!!multimarker}
+						onChange={handleMultimarkerToggle}
+						help={__('Allow placing multiple markers; edit each one via its popup on the map.', 'newopm')}
+						__nextHasNoMarginBottom
+					/>
+
 					<SelectControl
 						label='Size Preset'
 						value={sizePreset}
@@ -655,7 +892,7 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 						Save Current Settings as Default
 					</Button>
 
-					{markerPosition && (
+					{!multimarker && markerPosition && (
 						<div style={{ marginTop: '12px', padding: '12px', background: '#f0f0f0', borderRadius: '4px' }}>
 							<p style={{ margin: '0 0 4px 0', fontWeight: 'bold' }}>Marker Position</p>
 
@@ -699,6 +936,19 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 						</div>
 					)}
 
+					{multimarker && (
+						<div style={{ marginTop: '12px', padding: '12px', background: '#f0f0f0', borderRadius: '4px' }}>
+							<p style={{ margin: '0 0 4px 0', fontWeight: 'bold' }}>
+								{(markers || []).length === 1
+									? __('1 marker', 'newopm')
+									: sprintf(__('%d markers', 'newopm'), (markers || []).length)}
+							</p>
+							<p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
+								{__('Click a marker on the map to edit its label and color, or delete it.', 'newopm')}
+							</p>
+						</div>
+					)}
+
 					<div
 						style={{
 							marginTop: '16px',
@@ -709,11 +959,22 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 						}}
 					>
 						<p style={{ margin: '0', fontSize: '12px', color: '#856404' }}>
-							<strong>💡 Tip:</strong> Click to place a marker. Click and drag to pan the map.
+							<strong>💡 Tip:</strong>{' '}
+							{multimarker
+								? __('Click empty map area to add a marker. Click a marker to edit it. Press and hold a marker to move it. Click and drag empty area to pan the map.', 'newopm')
+								: __('Click to place a marker. Click and drag to pan the map.', 'newopm')}
 						</p>
 					</div>
 				</PanelBody>
 			</InspectorControls>
+
+			<ConfirmDialog
+				isOpen={isMultimarkerConfirmOpen}
+				onConfirm={handleConfirmDisableMultimarker}
+				onCancel={handleCancelDisableMultimarker}
+			>
+				{__('Achtung! Alle Marker werden entfernt!', 'newopm')}
+			</ConfirmDialog>
 
 			<div {...blockProps}>
 				<Suspense
@@ -742,11 +1003,19 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 						height={height}
 						isMapLoading={isMapLoading}
 						isSelected={isSelected}
-						onMapClick={handleMapClick}
+						onMapClick={handleMapClickCombined}
 						onZoomChange={handleZoomChange}
 						onCenterChange={handleCenterChange}
 						onMarkerDrag={handleMarkerDrag}
 						onMapReady={handleMapReady}
+						multimarker={!!multimarker}
+						markers={markers || []}
+						openPopupMarkerId={openPopupMarkerId}
+						onMarkerClick={handleMarkerClick}
+						onMarkerDragEnd={handleMarkerDragEndMulti}
+						onMarkerLabelChange={handleMarkerLabelChange}
+						onMarkerColorChange={handleMarkerColorChange}
+						onMarkerDelete={handleMarkerDelete}
 					/>
 				</Suspense>
 			</div>

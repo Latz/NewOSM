@@ -5,14 +5,20 @@
  * to improve initial editor load time. It's only loaded when the block is inserted.
  */
 
-import { Component, useEffect, useRef, useState, useMemo } from '@wordpress/element';
+import { Component, useEffect, useRef, useState, useMemo, useCallback } from '@wordpress/element';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { __ } from '@wordpress/i18n';
+import { TextControl, Button, ColorPalette } from '@wordpress/components';
 import L from 'leaflet';
 import { FullScreen } from 'leaflet.fullscreen';
 import 'leaflet.fullscreen/dist/Control.FullScreen.css';
-import { applySVGMarkerIcons } from '../utils/markerIcons';
+import { applySVGMarkerIcons, createMarkerIcon, MARKER_COLOR_PALETTE } from '../utils/markerIcons';
 import { getEditorTileConfig } from '../utils/devicePerformance';
+
+const MARKER_COLOR_OPTIONS = Object.entries(MARKER_COLOR_PALETTE).map(([name, color]) => ({ name, color }));
+
+const LONG_PRESS_MS = 450;
+const MOVE_CANCEL_PX = 5;
 
 /**
  * Error Boundary Component
@@ -131,13 +137,29 @@ class MapErrorBoundary extends Component {
 applySVGMarkerIcons(L);
 
 /**
- * Component to handle map interactions (clicks and zoom changes)
+ * Component to handle map interactions (clicks, zoom changes, and - in multimarker
+ * mode - per-marker hover/click/long-press-drag vs. whole-map panning)
  */
-function MapInteractionHandler({ onMapClick, onZoomChange, onCenterChange, isSelected }) {
+function MapInteractionHandler({
+	onMapClick,
+	onZoomChange,
+	onCenterChange,
+	isSelected,
+	multimarker,
+	markerRefsRef,
+	onMarkerClick,
+	onMarkerDragEnd,
+}) {
 	const map = useMap();
 	const isDraggingRef = useRef(false);
 	const dragStartRef = useRef(null);
 	const initialCenterRef = useRef(null);
+
+	// Multimarker long-press-to-drag state
+	const longPressTimerRef = useRef(null);
+	const longPressTargetRef = useRef(null); // { markerId, startX, startY }
+	const markerDragModeRef = useRef(false);
+	const markerDragStartLatLngRef = useRef(null);
 
 	useEffect(() => {
 		if (!map) return;
@@ -166,8 +188,45 @@ function MapInteractionHandler({ onMapClick, onZoomChange, onCenterChange, isSel
 		const mapContainer = map.getContainer();
 		const defaultCursor = isSelected ? 'crosshair' : 'default';
 
+		const clearLongPressState = () => {
+			if (longPressTimerRef.current) {
+				clearTimeout(longPressTimerRef.current);
+				longPressTimerRef.current = null;
+			}
+			longPressTargetRef.current = null;
+			markerDragModeRef.current = false;
+			markerDragStartLatLngRef.current = null;
+		};
+
 		const handleMouseDown = e => {
-			// Don't initiate drag on marker
+			const markerEl = multimarker ? e.target.closest('[data-marker-id]') : null;
+
+			// Marker mousedown in multimarker mode: start long-press timer instead of panning
+			if (markerEl) {
+				longPressTargetRef.current = {
+					markerId: markerEl.dataset.markerId,
+					startX: e.clientX,
+					startY: e.clientY,
+				};
+				longPressTimerRef.current = setTimeout(() => {
+					// Set drag mode first, unconditionally - it must never be skipped just
+					// because the (optional, smoothness-only) start-position capture below
+					// fails for some reason, or dragging would silently stop working.
+					markerDragModeRef.current = true;
+					mapContainer.style.cursor = 'grabbing';
+
+					const target = longPressTargetRef.current;
+					const markerInstance = target && markerRefsRef?.current?.[target.markerId];
+					if (markerInstance) {
+						markerDragStartLatLngRef.current = markerInstance.getLatLng();
+					}
+				}, LONG_PRESS_MS);
+				e.preventDefault();
+				e.stopPropagation();
+				return;
+			}
+
+			// Don't initiate map pan on marker (single-marker mode, or click missed data-marker-id)
 			if (e.target.classList.contains('leaflet-marker-icon')) {
 				return;
 			}
@@ -179,6 +238,61 @@ function MapInteractionHandler({ onMapClick, onZoomChange, onCenterChange, isSel
 		};
 
 		const handleMouseMove = e => {
+			// Multimarker: pending long-press on a marker - promote straight to dragging the
+			// moment the user moves past the threshold, instead of waiting out the full
+			// LONG_PRESS_MS timer first. A real press-and-drag gesture always involves some
+			// movement before the timer would fire; requiring perfect stillness first meant
+			// dragging almost never actually engaged (movement cancelled it outright, and the
+			// mouseup then fell through to "click on empty map", placing a stray new marker).
+			// The timer remains as a secondary path for holding still before moving.
+			if (longPressTargetRef.current && !markerDragModeRef.current) {
+				const target = longPressTargetRef.current;
+				const dx = e.clientX - target.startX;
+				const dy = e.clientY - target.startY;
+				if (Math.abs(dx) > MOVE_CANCEL_PX || Math.abs(dy) > MOVE_CANCEL_PX) {
+					if (longPressTimerRef.current) {
+						clearTimeout(longPressTimerRef.current);
+						longPressTimerRef.current = null;
+					}
+					markerDragModeRef.current = true;
+					mapContainer.style.cursor = 'grabbing';
+					const markerInstance = markerRefsRef?.current?.[target.markerId];
+					if (markerInstance) {
+						markerDragStartLatLngRef.current = markerInstance.getLatLng();
+					}
+					// Fall through to the "actively dragging" branch below so this same
+					// move event already repositions the marker - no missed first frame.
+				} else {
+					return;
+				}
+			}
+
+			// Multimarker: actively dragging a marker - move it live, don't pan.
+			// Uses the pixel delta since drag start (like map panning below), not an
+			// absolute cursor->latlng snap, so the marker doesn't jump to the exact
+			// cursor position (which rarely matches the icon's anchor point) at drag start.
+			// Falls back to the absolute cursor position if the start position wasn't
+			// captured for some reason, so dragging always moves the marker regardless.
+			if (markerDragModeRef.current && longPressTargetRef.current) {
+				const { startX, startY, markerId } = longPressTargetRef.current;
+				const markerInstance = markerRefsRef?.current?.[markerId];
+				if (!markerInstance) return;
+
+				let newLatLng;
+				if (markerDragStartLatLngRef.current) {
+					const dx = e.clientX - startX;
+					const dy = e.clientY - startY;
+					const startPoint = map.project(markerDragStartLatLngRef.current, map.getZoom());
+					const newPoint = L.point(startPoint.x + dx, startPoint.y + dy);
+					newLatLng = map.unproject(newPoint, map.getZoom());
+				} else {
+					newLatLng = map.mouseEventToLatLng(e);
+				}
+
+				markerInstance.setLatLng(newLatLng);
+				return;
+			}
+
 			if (!dragStartRef.current) return;
 
 			const dx = e.clientX - dragStartRef.current.x;
@@ -204,6 +318,37 @@ function MapInteractionHandler({ onMapClick, onZoomChange, onCenterChange, isSel
 		};
 
 		const handleMouseUp = e => {
+			// Multimarker: finish a marker drag - compute the final position the same
+			// delta-based way as the live drag above (with the same fallback), so the
+			// saved position matches exactly where the marker visually ended up.
+			if (markerDragModeRef.current && longPressTargetRef.current) {
+				const { startX, startY, markerId } = longPressTargetRef.current;
+
+				let newLatLng;
+				if (markerDragStartLatLngRef.current) {
+					const dx = e.clientX - startX;
+					const dy = e.clientY - startY;
+					const startPoint = map.project(markerDragStartLatLngRef.current, map.getZoom());
+					const newPoint = L.point(startPoint.x + dx, startPoint.y + dy);
+					newLatLng = map.unproject(newPoint, map.getZoom());
+				} else {
+					newLatLng = map.mouseEventToLatLng(e);
+				}
+
+				clearLongPressState();
+				mapContainer.style.cursor = defaultCursor;
+				onMarkerDragEnd(markerId, newLatLng);
+				return;
+			}
+
+			// Multimarker: released before long-press fired and didn't move = a click on the marker
+			if (longPressTargetRef.current) {
+				const markerId = longPressTargetRef.current.markerId;
+				clearLongPressState();
+				onMarkerClick(markerId);
+				return;
+			}
+
 			const wasDragging = isDraggingRef.current;
 			isDraggingRef.current = false;
 			dragStartRef.current = null;
@@ -217,6 +362,7 @@ function MapInteractionHandler({ onMapClick, onZoomChange, onCenterChange, isSel
 		};
 
 		const handleMouseLeave = () => {
+			clearLongPressState();
 			isDraggingRef.current = false;
 			dragStartRef.current = null;
 			initialCenterRef.current = null;
@@ -230,6 +376,7 @@ function MapInteractionHandler({ onMapClick, onZoomChange, onCenterChange, isSel
 		mapContainer.style.cursor = defaultCursor;
 
 		const handleGlobalMouseUp = () => {
+			clearLongPressState();
 			isDraggingRef.current = false;
 			dragStartRef.current = null;
 			initialCenterRef.current = null;
@@ -239,6 +386,7 @@ function MapInteractionHandler({ onMapClick, onZoomChange, onCenterChange, isSel
 		document.addEventListener('mouseup', handleGlobalMouseUp);
 
 		return () => {
+			clearLongPressState();
 			mapContainer.removeEventListener('mousedown', handleMouseDown);
 			mapContainer.removeEventListener('mousemove', handleMouseMove);
 			mapContainer.removeEventListener('mouseup', handleMouseUp);
@@ -250,7 +398,7 @@ function MapInteractionHandler({ onMapClick, onZoomChange, onCenterChange, isSel
 				map.dragging.enable();
 			}
 		};
-	}, [map, onMapClick, onZoomChange, onCenterChange, isSelected]);
+	}, [map, onMapClick, onZoomChange, onCenterChange, isSelected, multimarker, markerRefsRef, onMarkerClick, onMarkerDragEnd]);
 
 	return null;
 }
@@ -276,6 +424,84 @@ function DraggableMarker({ position, onDragEnd, label }) {
 	return (
 		<Marker draggable={true} eventHandlers={eventHandlers} position={position} ref={setMarkerRef}>
 			<Popup>{label || `Lat: ${position.lat.toFixed(5)}, Lon: ${position.lng.toFixed(5)}`}</Popup>
+		</Marker>
+	);
+}
+
+/**
+ * A single marker in multimarker mode. Click/long-press-drag are handled centrally by
+ * MapInteractionHandler (via the marker's data-marker-id DOM attribute), not by react-leaflet's
+ * own drag/click handlers, to keep one source of truth for gesture disambiguation. The popup
+ * holds the per-marker options (label, color, delete) that replace the sidebar UI used in
+ * single-marker mode.
+ * @param {Object}   props
+ * @param {Object}   props.marker         - { id, lat, lon, label, color }
+ * @param {boolean}  props.isPopupOpen    - Whether this marker's popup should be open
+ * @param {Function} props.registerRef    - (markerId, leafletMarkerInstance|null) => void
+ * @param {Function} props.onLabelChange  - (markerId, label) => void
+ * @param {Function} props.onColorChange  - (markerId, color) => void
+ * @param {Function} props.onDelete       - (markerId) => void
+ */
+function MultiMarker({ marker, isPopupOpen, registerRef, onLabelChange, onColorChange, onDelete }) {
+	const [markerRef, setMarkerRef] = useState(null);
+	const icon = useMemo(() => createMarkerIcon({ color: marker.color, markerId: marker.id }), [marker.color, marker.id]);
+
+	useEffect(() => {
+		registerRef(marker.id, markerRef);
+		return () => registerRef(marker.id, null);
+	}, [marker.id, markerRef, registerRef]);
+
+	useEffect(() => {
+		if (!markerRef) return;
+		// bindPopup() (implicit via the <Popup> child) auto-attaches its own native
+		// 'click' -> togglePopup() listener. We already dispatch marker clicks
+		// ourselves via MapInteractionHandler (onMarkerClick) to disambiguate them
+		// from long-press-drag, so remove Leaflet's listener to avoid a double-toggle -
+		// visible as the popup's autoPan fighting itself (map jitters) near map edges.
+		markerRef.off('click');
+	}, [markerRef]);
+
+	useEffect(() => {
+		if (!markerRef) return;
+		if (isPopupOpen) {
+			markerRef.openPopup();
+		} else {
+			markerRef.closePopup();
+		}
+	}, [isPopupOpen, markerRef]);
+
+	return (
+		<Marker position={[marker.lat, marker.lon]} icon={icon} ref={setMarkerRef}>
+			<Popup>
+				<div className='newopm-marker-popup'>
+					<TextControl
+						label={__('Marker Label', 'newopm')}
+						value={marker.label || ''}
+						onChange={value => onLabelChange(marker.id, value)}
+						placeholder={__('Customize marker text', 'newopm')}
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
+					/>
+					<ColorPalette
+						colors={MARKER_COLOR_OPTIONS}
+						value={MARKER_COLOR_PALETTE[marker.color] || MARKER_COLOR_PALETTE.blue}
+						onChange={colorValue => {
+							const match = MARKER_COLOR_OPTIONS.find(option => option.color === colorValue);
+							onColorChange(marker.id, match ? match.name : 'blue');
+						}}
+						disableCustomColors
+						clearable={false}
+					/>
+					<Button
+						isDestructive
+						variant='secondary'
+						onClick={() => onDelete(marker.id)}
+						style={{ marginTop: '8px', width: '100%' }}
+					>
+						{__('Delete Marker', 'newopm')}
+					</Button>
+				</div>
+			</Popup>
 		</Marker>
 	);
 }
@@ -393,10 +619,30 @@ export default function MapEditor({
 	onCenterChange,
 	onMarkerDrag,
 	onMapReady,
+	multimarker,
+	markers,
+	openPopupMarkerId,
+	onMarkerClick,
+	onMarkerDragEnd,
+	onMarkerLabelChange,
+	onMarkerColorChange,
+	onMarkerDelete,
 }) {
 	// Get optimal tile configuration based on device performance
 	// See FUTURE_OPTIMIZATIONS.md #3 - Virtualize Tile Rendering
 	const tileConfig = useMemo(() => getEditorTileConfig(), []);
+
+	// Registry of live Leaflet marker instances, keyed by marker id, so
+	// MapInteractionHandler can move a marker directly during a long-press-drag
+	// without waiting for a React re-render on every mousemove.
+	const markerRefsRef = useRef({});
+	const registerMarkerRef = useCallback((markerId, instance) => {
+		if (instance) {
+			markerRefsRef.current[markerId] = instance;
+		} else {
+			delete markerRefsRef.current[markerId];
+		}
+	}, []);
 
 	return (
 		<MapErrorBoundary>
@@ -431,8 +677,29 @@ export default function MapEditor({
 					<MapLoadingHandler onMapReady={onMapReady} />
 					<MapViewSync center={center} zoom={zoom} />
 					<FullscreenControl />
-					<MapInteractionHandler onMapClick={onMapClick} onZoomChange={onZoomChange} onCenterChange={onCenterChange} isSelected={isSelected} />
-					{markerPosition && <DraggableMarker position={markerPosition} onDragEnd={onMarkerDrag} label={markerLabel} />}
+					<MapInteractionHandler
+						onMapClick={onMapClick}
+						onZoomChange={onZoomChange}
+						onCenterChange={onCenterChange}
+						isSelected={isSelected}
+						multimarker={multimarker}
+						markerRefsRef={markerRefsRef}
+						onMarkerClick={onMarkerClick}
+						onMarkerDragEnd={onMarkerDragEnd}
+					/>
+					{multimarker
+						? (markers || []).map(marker => (
+								<MultiMarker
+									key={marker.id}
+									marker={marker}
+									isPopupOpen={marker.id === openPopupMarkerId}
+									registerRef={registerMarkerRef}
+									onLabelChange={onMarkerLabelChange}
+									onColorChange={onMarkerColorChange}
+									onDelete={onMarkerDelete}
+								/>
+							))
+						: markerPosition && <DraggableMarker position={markerPosition} onDragEnd={onMarkerDrag} label={markerLabel} />}
 				</MapContainer>
 				{isMapLoading && (
 					<div

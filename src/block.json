@@ -32,6 +32,24 @@
 			"type": "string",
 			"default": ""
 		},
+		"multimarker": {
+			"type": "boolean",
+			"default": false
+		},
+		"markers": {
+			"type": "array",
+			"default": [],
+			"items": {
+				"type": "object",
+				"properties": {
+					"id": { "type": "string" },
+					"lat": { "type": "number" },
+					"lon": { "type": "number" },
+					"label": { "type": "string" },
+					"color": { "type": "string" }
+				}
+			}
+		},
 		"height": {
 			"type": "number",
 			"default": 400
