@@ -8,6 +8,20 @@ build/
 # Test coverage
 coverage/
 .nyc_output/
+bin/reports/
+
+# Composer dependencies
+vendor/
+.phpunit.result.cache
+
+# Test runner artifacts
+test-results/
+playwright-report/
+blob-report/
+.playwright-cache/
+
+# wp-env local state
+.wp-env-override.json
 /FUTURE_OPTIMIZATIONS.md
 /PERFORMANCE_OPTIMIZATIONS.md
 /TROUBLESHOOTING.md

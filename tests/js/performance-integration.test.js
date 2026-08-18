@@ -2,19 +2,21 @@
  * Integration tests for performance optimizations
  * Tests actual runtime behavior of memoization and debouncing
  */
+import { useMemo } from '@wordpress/element';
+import { renderHook } from '@testing-library/react';
 
 describe('Performance Integration Tests', () => {
 	describe('Debounce Utility', () => {
 		beforeEach(() => {
-			jest.useFakeTimers();
+			vi.useFakeTimers();
 		});
 
 		afterEach(() => {
-			jest.useRealTimers();
+			vi.useRealTimers();
 		});
 
 		test('debounce should delay function execution', () => {
-			const mockFn = jest.fn();
+			const mockFn = vi.fn();
 			const debounceDelay = 150;
 
 			// Simulate debounced function
@@ -37,11 +39,11 @@ describe('Performance Integration Tests', () => {
 			expect(mockFn).not.toHaveBeenCalled();
 
 			// Fast-forward time by 100ms (less than delay)
-			jest.advanceTimersByTime(100);
+			vi.advanceTimersByTime(100);
 			expect(mockFn).not.toHaveBeenCalled();
 
 			// Fast-forward remaining time
-			jest.advanceTimersByTime(50);
+			vi.advanceTimersByTime(50);
 
 			// Should have been called once with the last value
 			expect(mockFn).toHaveBeenCalledTimes(1);
@@ -49,7 +51,7 @@ describe('Performance Integration Tests', () => {
 		});
 
 		test('debounce should cancel previous calls', () => {
-			const mockFn = jest.fn();
+			const mockFn = vi.fn();
 			const debounceDelay = 150;
 
 			let timeoutId;
@@ -64,17 +66,17 @@ describe('Performance Integration Tests', () => {
 
 			// Call function
 			debouncedFn(1);
-			jest.advanceTimersByTime(100);
+			vi.advanceTimersByTime(100);
 
 			// Call again before first completes
 			debouncedFn(2);
-			jest.advanceTimersByTime(100);
+			vi.advanceTimersByTime(100);
 
 			// Call again before second completes
 			debouncedFn(3);
 
 			// Fast-forward to completion
-			jest.advanceTimersByTime(150);
+			vi.advanceTimersByTime(150);
 
 			// Should only have been called once with final value
 			expect(mockFn).toHaveBeenCalledTimes(1);
@@ -84,43 +86,33 @@ describe('Performance Integration Tests', () => {
 
 	describe('Memoization Behavior', () => {
 		test('useMemo should prevent array recreation with same values', () => {
-			const { useMemo } = require('@wordpress/element');
+			const { result, rerender } = renderHook(
+				({ latitude, longitude }) => useMemo(() => [latitude, longitude], [latitude, longitude]),
+				{ initialProps: { latitude: 51.505, longitude: -0.09 } }
+			);
 
-			// Simulate the center calculation
-			let latitude = 51.505;
-			let longitude = -0.09;
+			const center1 = result.current;
 
-			// First render
-			const center1 = useMemo(() => [latitude, longitude], [latitude, longitude]);
+			// Re-render with the same values — useMemo should return the same array reference.
+			rerender({ latitude: 51.505, longitude: -0.09 });
+			const center2 = result.current;
 
-			// Second render with same values
-			const center2 = useMemo(() => [latitude, longitude], [latitude, longitude]);
-
-			// Note: In actual React, these would be the same reference
-			// In this test, we're just verifying the pattern exists
-			expect(Array.isArray(center1)).toBe(true);
-			expect(Array.isArray(center2)).toBe(true);
+			expect(center2).toBe(center1);
 		});
 
 		test('useMemo should recalculate when dependencies change', () => {
-			const { useMemo } = require('@wordpress/element');
+			const { result, rerender } = renderHook(
+				({ latitude, longitude }) => useMemo(() => [latitude, longitude], [latitude, longitude]),
+				{ initialProps: { latitude: 51.505, longitude: -0.09 } }
+			);
 
-			let latitude = 51.505;
-			let longitude = -0.09;
+			const center1 = result.current;
 
-			// First calculation
-			const center1 = useMemo(() => [latitude, longitude], [latitude, longitude]);
+			rerender({ latitude: 52.0, longitude: -1.0 });
+			const center2 = result.current;
 
-			// Change values
-			latitude = 52.0;
-			longitude = -1.0;
-
-			// Second calculation with new values
-			const center2 = useMemo(() => [latitude, longitude], [latitude, longitude]);
-
-			// Values should be different
-			expect(center1[0]).not.toBe(center2[0]);
-			expect(center1[1]).not.toBe(center2[1]);
+			expect(center2).not.toBe(center1);
+			expect(center2).toEqual([52.0, -1.0]);
 		});
 	});
 

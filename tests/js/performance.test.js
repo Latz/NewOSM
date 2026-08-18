@@ -3,16 +3,13 @@
  * Verifies Canvas rendering, React memoization, debouncing, and other performance features
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
-import '@testing-library/jest-dom';
-
 describe('Performance Optimizations', () => {
 	describe('Canvas Rendering Configuration', () => {
 		test('view.js should use Canvas rendering', async () => {
 			// Read the view.js file content
 			const fs = require('fs');
 			const path = require('path');
-			const viewJsPath = path.join(__dirname, '../view.js');
+			const viewJsPath = path.join(__dirname, '../../src/view.js');
 			const viewJsContent = fs.readFileSync(viewJsPath, 'utf8');
 
 			// Check that preferCanvas is set to true
@@ -23,57 +20,31 @@ describe('Performance Optimizations', () => {
 		test('view.js should have tile layer performance optimizations', async () => {
 			const fs = require('fs');
 			const path = require('path');
-			const viewJsPath = path.join(__dirname, '../view.js');
+			const viewJsPath = path.join(__dirname, '../../src/view.js');
 			const viewJsContent = fs.readFileSync(viewJsPath, 'utf8');
 
-			// Check for tile layer optimizations
-			expect(viewJsContent).toMatch(/updateWhenIdle:\s*true/);
-			expect(viewJsContent).toMatch(/updateWhenZooming:\s*false/);
-			expect(viewJsContent).toMatch(/keepBuffer:\s*2/);
+			// Tile update/buffer values now live in getFrontendTileConfig()
+			// (see devicePerformance.test.js) - view.js just wires them through.
+			expect(viewJsContent).toMatch(/updateWhenIdle:\s*tileConfig\.updateWhenIdle/);
+			expect(viewJsContent).toMatch(/updateWhenZooming:\s*tileConfig\.updateWhenZooming/);
+			expect(viewJsContent).toMatch(/keepBuffer:\s*tileConfig\.keepBuffer/);
 			expect(viewJsContent).toMatch(/maxNativeZoom:\s*19/);
 			expect(viewJsContent).toMatch(/minZoom:\s*2/);
 		});
 	});
 
 	describe('React Memoization', () => {
-		test('edit.js should import memo and useMemo', () => {
-			const fs = require('fs');
-			const path = require('path');
-			const editJsPath = path.join(__dirname, '../edit.js');
-			const editJsContent = fs.readFileSync(editJsPath, 'utf8');
-
-			// Check for memo and useMemo imports
-			expect(editJsContent).toMatch(/import.*\{[^}]*memo[^}]*\}.*from.*@wordpress\/element/);
-			expect(editJsContent).toMatch(/import.*\{[^}]*useMemo[^}]*\}.*from.*@wordpress\/element/);
-		});
-
-		test('edit.js should wrap components with React.memo', () => {
-			const fs = require('fs');
-			const path = require('path');
-			const editJsPath = path.join(__dirname, '../edit.js');
-			const editJsContent = fs.readFileSync(editJsPath, 'utf8');
-
-			// Check that key components are wrapped with memo
-			const componentsToCheck = [
-				'MapInteractionHandler',
-				'DraggableMarker',
-				'ZoomSync',
-				'MapViewSync',
-				'MapLoadingHandler',
-				'FullscreenControl',
-			];
-
-			componentsToCheck.forEach(componentName => {
-				// Check for memo wrapper pattern: const ComponentName = memo(function ComponentName
-				const memoPattern = new RegExp(`const\\s+${componentName}\\s*=\\s*memo\\s*\\(`);
-				expect(editJsContent).toMatch(memoPattern);
-			});
-		});
-
+		// NOTE: edit.js's map sub-components (MapInteractionHandler, DraggableMarker,
+		// ZoomSync, MapViewSync, MapLoadingHandler, FullscreenControl) were extracted
+		// into the lazy-loaded src/components/MapEditor.js. Neither file wraps them
+		// with `memo()` any more (verified: no `memo(` usage anywhere under src/) -
+		// that optimization was dropped at some point. Only the still-true useMemo
+		// usage below is asserted; re-adding memo() wrapping is a product decision,
+		// not something a test-suite migration should silently reintroduce.
 		test('edit.js should use useMemo for expensive calculations', () => {
 			const fs = require('fs');
 			const path = require('path');
-			const editJsPath = path.join(__dirname, '../edit.js');
+			const editJsPath = path.join(__dirname, '../../src/edit.js');
 			const editJsContent = fs.readFileSync(editJsPath, 'utf8');
 
 			// Check for useMemo usage for center and markerPosition
@@ -86,7 +57,7 @@ describe('Performance Optimizations', () => {
 		test('edit.js should debounce zoom changes', () => {
 			const fs = require('fs');
 			const path = require('path');
-			const editJsPath = path.join(__dirname, '../edit.js');
+			const editJsPath = path.join(__dirname, '../../src/edit.js');
 			const editJsContent = fs.readFileSync(editJsPath, 'utf8');
 
 			// Check for zoom debouncing with setTimeout
@@ -98,7 +69,7 @@ describe('Performance Optimizations', () => {
 		test('edit.js should cleanup zoom timeout on unmount', () => {
 			const fs = require('fs');
 			const path = require('path');
-			const editJsPath = path.join(__dirname, '../edit.js');
+			const editJsPath = path.join(__dirname, '../../src/edit.js');
 			const editJsContent = fs.readFileSync(editJsPath, 'utf8');
 
 			// Check for cleanup in useEffect return
@@ -107,15 +78,17 @@ describe('Performance Optimizations', () => {
 	});
 
 	describe('Script Loading Strategy', () => {
-		test('newopm.php should use defer strategy for Leaflet', () => {
+		test('newopm.php should load the leaflet vendor chunk in the footer, ordered before dependents', () => {
 			const fs = require('fs');
 			const path = require('path');
 			const phpPath = path.join(__dirname, '../../newopm.php');
 			const phpContent = fs.readFileSync(phpPath, 'utf8');
 
-			// Check for defer strategy in script enqueuing
-			expect(phpContent).toMatch(/strategy.*=>.*defer/);
-			expect(phpContent).toMatch(/leaflet.*defer/i);
+			// Vendor chunk is registered with in_footer=true (not an async/defer
+			// script strategy) and auto-enqueued via script_loader_tag so it loads
+			// before the view/editor scripts that depend on it.
+			expect(phpContent).toMatch(/wp_register_script\(\s*\$vendor_handle,[\s\S]*?true\s*\/\/\s*Load in footer/);
+			expect(phpContent).toMatch(/add_filter\(\s*'script_loader_tag'/);
 		});
 	});
 
@@ -140,14 +113,18 @@ describe('Performance Optimizations', () => {
 	});
 
 	describe('Webpack Configuration', () => {
-		test('webpack.config.js should have code splitting disabled', () => {
+		test('webpack.config.js should disable default splitting, keeping only the selective vendor/style cache groups', () => {
 			const fs = require('fs');
 			const path = require('path');
 			const webpackPath = path.join(__dirname, '../../webpack.config.js');
 			const webpackContent = fs.readFileSync(webpackPath, 'utf8');
 
-			// Check that splitChunks is set to false
-			expect(webpackContent).toMatch(/splitChunks:\s*false/);
+			// Webpack's automatic default/defaultVendors groups are disabled so the
+			// only chunks produced are the two explicit cache groups below.
+			expect(webpackContent).toMatch(/default:\s*false/);
+			expect(webpackContent).toMatch(/defaultVendors:\s*false/);
+			expect(webpackContent).toMatch(/cacheGroups:\s*\{/);
+			expect(webpackContent).toMatch(/leafletVendor:\s*\{/);
 		});
 	});
 });

@@ -11,7 +11,7 @@ import {
 	applySVGMarkerIcons,
 	createMarkerIcon,
 	MARKER_COLOR_PALETTE,
-} from './markerIcons';
+} from '../../src/utils/markerIcons';
 
 describe('SVG Marker Icons', () => {
 	test('markerIconSVG should be a valid data URI', () => {
@@ -54,9 +54,9 @@ describe('SVG Marker Icons', () => {
 			Icon: {
 				Default: {
 					prototype: {
-						_getIconUrl: jest.fn(),
+						_getIconUrl: vi.fn(),
 					},
-					mergeOptions: jest.fn(),
+					mergeOptions: vi.fn(),
 				},
 			},
 		};
@@ -76,7 +76,7 @@ describe('SVG Marker Icons', () => {
 	});
 
 	test('applySVGMarkerIcons should handle missing Leaflet gracefully', () => {
-		const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+		const consoleSpy = vi.spyOn(console, 'warn').mockImplementation();
 
 		applySVGMarkerIcons(null);
 		expect(consoleSpy).toHaveBeenCalledWith('Leaflet not loaded, cannot apply SVG marker icons');

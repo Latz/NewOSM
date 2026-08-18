@@ -8,7 +8,7 @@ import {
 	getEditorTileConfig,
 	getFrontendTileConfig,
 	getDeviceInfo,
-} from './devicePerformance';
+} from '../../src/utils/devicePerformance';
 
 describe('Device Performance Detection', () => {
 	// Store original values to restore after tests

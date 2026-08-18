@@ -5,8 +5,19 @@
   "scripts": {
     "build": "wp-scripts build",
     "start": "wp-scripts start",
-    "test": "wp-scripts test-unit-js",
-    "test:watch": "wp-scripts test-unit-js --watch"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:js": "vitest run",
+    "test:js:watch": "vitest",
+    "test:js:coverage": "vitest run --coverage",
+    "env:start": "wp-env start",
+    "env:stop": "wp-env stop",
+    "env:clean": "wp-env clean all",
+    "env:logs": "wp-env logs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:api": "playwright test tests/e2e/api",
+    "test:e2e:debug": "playwright test --debug"
   },
   "sideEffects": [
     "*.css",
@@ -15,9 +26,15 @@
     "src/service-worker.js"
   ],
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@testing-library/react": "^16.3.2",
+    "@vitest/coverage-v8": "^3.2.6",
+    "@wordpress/env": "^10.0.0",
     "@wordpress/scripts": "^19.2.4",
     "copy-webpack-plugin": "^13.0.1",
-    "postcss-nesting": "^14.0.0"
+    "jsdom": "^25.0.0",
+    "postcss-nesting": "^14.0.0",
+    "vitest": "^3.2.6"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

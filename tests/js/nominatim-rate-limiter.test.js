@@ -1,10 +1,10 @@
 /**
  * Tests for NominatimRateLimiter
  */
-import { NominatimRateLimiter } from './nominatim-rate-limiter';
+import { NominatimRateLimiter } from '../../src/utils/nominatim-rate-limiter';
 
 // Mock fetch globally
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 describe('NominatimRateLimiter', () => {
 	let rateLimiter;
@@ -12,7 +12,7 @@ describe('NominatimRateLimiter', () => {
 	beforeEach(() => {
 		rateLimiter = new NominatimRateLimiter();
 		fetch.mockClear();
-		jest.clearAllTimers();
+		vi.clearAllTimers();
 	});
 
 	describe('caching', () => {
@@ -51,7 +51,7 @@ describe('NominatimRateLimiter', () => {
 
 			// Fast-forward 6 minutes
 			const originalDateNow = Date.now;
-			Date.now = jest.fn(() => originalDateNow() + 6 * 60 * 1000);
+			Date.now = vi.fn(() => originalDateNow() + 6 * 60 * 1000);
 
 			// Second request (cache should be expired)
 			await rateLimiter.request(url);
@@ -86,7 +86,7 @@ describe('NominatimRateLimiter', () => {
 
 	describe('rate limiting', () => {
 		test('enforces minimum 1 second between requests', async () => {
-			jest.useFakeTimers();
+			vi.useFakeTimers();
 
 			const mockData = { display_name: 'Test Location' };
 			fetch.mockResolvedValue({
@@ -99,14 +99,14 @@ describe('NominatimRateLimiter', () => {
 
 			// Start first request
 			const promise1 = rateLimiter.request(url1);
-			jest.runAllTimers();
+			vi.runAllTimers();
 			await promise1;
 
 			const timeBeforeSecondRequest = Date.now();
 
 			// Start second request immediately
 			const promise2 = rateLimiter.request(url2);
-			jest.runAllTimers();
+			vi.runAllTimers();
 			await promise2;
 
 			const timeAfterSecondRequest = Date.now();
@@ -114,7 +114,7 @@ describe('NominatimRateLimiter', () => {
 			// Should have waited at least 1 second
 			expect(timeAfterSecondRequest - timeBeforeSecondRequest).toBeGreaterThanOrEqual(1000);
 
-			jest.useRealTimers();
+			vi.useRealTimers();
 		});
 	});
 

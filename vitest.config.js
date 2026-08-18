@@ -1,6 +1,17 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+	resolve: {
+		alias: {
+			// @wordpress/element bundles its own (older) React copy internally.
+			// @testing-library/react's renderHook/render use the top-level `react`
+			// package's dispatcher — two different React instances can't share
+			// hook state, which throws "Invalid hook call". Aliasing forces
+			// `@wordpress/element` imports to resolve to the same top-level React
+			// used by testing-library, matching lynxjournal's vitest setup.
+			'@wordpress/element': 'react',
+		},
+	},
 	test: {
 		globals: true,
 		environment: 'jsdom',

@@ -6,7 +6,7 @@ import {
 	isValidLongitude,
 	isValidZoom,
 	validateMapConfig,
-} from './validation';
+} from '../../src/utils/validation';
 
 describe('isValidLatitude', () => {
 	test('accepts valid latitudes', () => {

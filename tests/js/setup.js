@@ -1,7 +1,8 @@
 /**
- * Jest test setup file
+ * Vitest test setup file
  * Runs before each test file
  */
+import { vi } from 'vitest';
 
 // Mock WordPress i18n functions
 global.wp = {
@@ -22,9 +23,9 @@ global.__ = global.wp.i18n.__;
 // Mock console methods to reduce test output noise
 global.console = {
 	...console,
-	error: jest.fn(),
-	warn: jest.fn(),
-	log: jest.fn(),
+	error: vi.fn(),
+	warn: vi.fn(),
+	log: vi.fn(),
 };
 
 // Add custom matchers if needed
