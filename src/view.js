@@ -176,13 +176,55 @@ function initializeNewOpmMaps() {
 				minZoom: 2,
 			}).addTo(map);
 
+			/**
+			 * Binds a popup to a marker that opens on hover (Google Maps-style info card)
+			 * instead of requiring a click, while a short close delay keeps it open while
+			 * the pointer travels from the marker onto the popup itself. Leaflet's default
+			 * click-to-toggle behavior from bindPopup still applies, so tap-to-open keeps
+			 * working on touch devices.
+			 * @param {L.Marker}           marker  - The Leaflet marker to attach the popup to
+			 * @param {string|HTMLElement} content - Popup content (label string or DOM node)
+			 */
+			const bindHoverPopup = function (marker, content) {
+				marker.bindPopup(content, { closeButton: false, autoPan: false });
+
+				let closeTimeout = null;
+				const cancelClose = function () {
+					if (closeTimeout) {
+						clearTimeout(closeTimeout);
+						closeTimeout = null;
+					}
+				};
+				const scheduleClose = function () {
+					cancelClose();
+					closeTimeout = setTimeout(function () {
+						marker.closePopup();
+					}, 150);
+				};
+
+				marker.on('mouseover', function () {
+					cancelClose();
+					marker.openPopup();
+				});
+				marker.on('mouseout', scheduleClose);
+				marker.on('popupopen', function (e) {
+					const popupEl = e.popup.getElement();
+					if (popupEl) {
+						popupEl.addEventListener('mouseenter', cancelClose);
+						popupEl.addEventListener('mouseleave', scheduleClose);
+					}
+				});
+
+				cleanupFunctions.push(cancelClose);
+			};
+
 			// Add marker(s) if present - either the legacy single marker, or (when
 			// multimarker mode is enabled) the JSON-encoded markers list
 			if (!isMultimarker) {
 				if (!isNaN(markerLat) && !isNaN(markerLon)) {
 					const marker = L.marker([markerLat, markerLon]).addTo(map);
 					if (markerLabel) {
-						marker.bindPopup(markerLabel);
+						bindHoverPopup(marker, markerLabel);
 					}
 				}
 			} else if (markersJson) {
@@ -207,7 +249,7 @@ function initializeNewOpmMaps() {
 						const popupEl = document.createElement('div');
 						popupEl.className = 'newopm-marker-popup-frontend';
 						popupEl.textContent = m.label;
-						marker.bindPopup(popupEl);
+						bindHoverPopup(marker, popupEl);
 					}
 
 					cleanupFunctions.push(function () {
