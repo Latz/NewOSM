@@ -243,12 +243,31 @@ function initializeNewOpmMaps() {
 					const icon = createMarkerIcon({ color: m.color, markerId: m.id });
 					const marker = L.marker([m.lat, m.lon], { icon }).addTo(map);
 
-					if (m.label) {
-						// Build popup content via textContent, never innerHTML, so a marker
-						// label can never inject markup/scripts into the page
+					if (m.label || m.image) {
+						// Label is authored via the editor's RichText control (allowedFormats
+						// restricted to bold/italic/link), so it is intentionally rendered via
+						// innerHTML rather than textContent. This relies on the same trust
+						// boundary as any other RichText-authored block content: the HTML is
+						// sanitized server-side (wp_kses_post) when the post is saved for users
+						// without unfiltered_html. Image src/alt are still set via element
+						// properties, never parsed as markup.
 						const popupEl = document.createElement('div');
-						popupEl.className = 'newopm-marker-popup-frontend';
-						popupEl.textContent = m.label;
+						popupEl.className = m.image
+							? 'newopm-marker-popup-frontend newopm-marker-popup-frontend--with-image'
+							: 'newopm-marker-popup-frontend';
+						if (m.image) {
+							const imageEl = document.createElement('img');
+							imageEl.className = 'newopm-marker-popup-image';
+							imageEl.src = m.image;
+							imageEl.alt = m.label ? m.label.replace(/<[^>]*>/g, '') : '';
+							popupEl.appendChild(imageEl);
+						}
+						if (m.label) {
+							const labelEl = document.createElement('div');
+							labelEl.className = 'newopm-marker-popup-text';
+							labelEl.innerHTML = m.label;
+							popupEl.appendChild(labelEl);
+						}
 						bindHoverPopup(marker, popupEl);
 					}
 

@@ -35,8 +35,8 @@ module.exports = {
 					test: /[\\/]style(\.module)?\.(sc|sa|c)ss$/,
 					chunks: 'all',
 					enforce: true,
-					name(module, chunks, cacheGroupKey) {
-						return `${cacheGroupKey}-${chunks[0].name}`;
+					name(module, chunks) {
+						return chunks[0].name;
 					},
 				},
 				// Extract Leaflet vendor libraries to shared chunk
