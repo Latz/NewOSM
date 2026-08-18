@@ -273,10 +273,10 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 				if (defaults.longitude && attributes.longitude === -0.09) {
 					updates.longitude = defaults.longitude;
 				}
-				if (defaults.markerLat && !attributes.markerLat) {
+				if (typeof defaults.markerLat === 'number' && typeof attributes.markerLat !== 'number') {
 					updates.markerLat = defaults.markerLat;
 				}
-				if (defaults.markerLon && !attributes.markerLon) {
+				if (typeof defaults.markerLon === 'number' && typeof attributes.markerLon !== 'number') {
 					updates.markerLon = defaults.markerLon;
 				}
 				if (defaults.markerLabel && !attributes.markerLabel) {
@@ -299,7 +299,7 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 	useEffect(() => {
 		const loadExistingMarkerAddress = async () => {
 			// Only fetch if we have marker coordinates but no label or address yet
-			if (markerLat && markerLon && !markerAddress) {
+			if (typeof markerLat === 'number' && typeof markerLon === 'number' && !markerAddress) {
 				setIsLoadingAddress(true);
 				try {
 					const data = await nominatimAPI.reverse(markerLat, markerLon);
@@ -817,7 +817,7 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 	// Memoize expensive calculations to prevent unnecessary re-renders
 	const center = useMemo(() => [latitude, longitude], [latitude, longitude]);
 	const markerPosition = useMemo(
-		() => (markerLat && markerLon ? [markerLat, markerLon] : null),
+		() => (typeof markerLat === 'number' && typeof markerLon === 'number' ? [markerLat, markerLon] : null),
 		[markerLat, markerLon]
 	);
 

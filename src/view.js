@@ -23,9 +23,14 @@ const tileConfig = getFrontendTileConfig();
 // Enables cache-first strategy for OSM tiles, offline map support, and persistent cache
 if (typeof window !== 'undefined') {
 	const registerSW = () => {
-		const pluginUrl = window.newOpmData?.pluginUrl || '';
-		const swPath = pluginUrl + 'build/service-worker.js';
-		registerServiceWorker(swPath);
+		// Served through the REST API, not build/service-worker.js directly, so the
+		// response can carry Service-Worker-Allowed and claim a sitewide scope -
+		// see newopm_rest_serve_sw()'s docblock in newopm.php for why the direct
+		// static path can't (and shouldn't rely on a standalone PHP file either).
+		const swPath = window.newOpmData?.swUrl;
+		if (swPath) {
+			registerServiceWorker(swPath);
+		}
 	};
 
 	if (document.readyState === 'loading') {
