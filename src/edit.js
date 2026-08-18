@@ -8,12 +8,17 @@ import {
 	SelectControl,
 	Spinner,
 	ToggleControl,
+	Modal,
+	ColorPalette,
 	__experimentalConfirmDialog as ConfirmDialog,
 } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import { __, sprintf } from '@wordpress/i18n';
 import { dispatch } from '@wordpress/data';
 import 'leaflet/dist/leaflet.css';
+import { MARKER_COLOR_PALETTE } from './utils/markerIcons';
+
+const MARKER_COLOR_OPTIONS = Object.entries(MARKER_COLOR_PALETTE).map(([name, color]) => ({ name, color }));
 
 // Lazy load the heavy map editor component
 // This improves initial editor load time by deferring ~440KB of Leaflet code
@@ -194,6 +199,7 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 	} = attributes;
 	const [openPopupMarkerId, setOpenPopupMarkerId] = useState(null);
 	const [isMultimarkerConfirmOpen, setIsMultimarkerConfirmOpen] = useState(false);
+	const [isMarkerListOpen, setIsMarkerListOpen] = useState(false);
 
 	// Kept in sync with the `markers` attribute so multimarker handlers can read/write
 	// the latest array synchronously (avoids races between rapid consecutive edits and
@@ -943,9 +949,14 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 									? __('1 marker', 'newopm')
 									: sprintf(__('%d markers', 'newopm'), (markers || []).length)}
 							</p>
-							<p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
+							<p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#666' }}>
 								{__('Click a marker on the map to edit its label and color, or delete it.', 'newopm')}
 							</p>
+							{(markers || []).length > 0 && (
+								<Button variant='secondary' onClick={() => setIsMarkerListOpen(true)} style={{ width: '100%' }}>
+									{__('Manage All Markers', 'newopm')}
+								</Button>
+							)}
 						</div>
 					)}
 
@@ -975,6 +986,71 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 			>
 				{__('Achtung! Alle Marker werden entfernt!', 'newopm')}
 			</ConfirmDialog>
+
+			{isMarkerListOpen && (
+				<Modal
+					title={sprintf(__('Manage Markers (%d)', 'newopm'), (markers || []).length)}
+					onRequestClose={() => setIsMarkerListOpen(false)}
+					style={{ width: '600px', maxWidth: '90vw' }}
+				>
+					{(markers || []).length === 0 ? (
+						<p>{__('No markers yet. Click the map to add one.', 'newopm')}</p>
+					) : (
+						<div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+							{(markers || []).map((marker, index) => (
+								<div
+									key={marker.id}
+									style={{
+										display: 'flex',
+										alignItems: 'flex-start',
+										gap: '12px',
+										padding: '12px',
+										border: '1px solid #ddd',
+										borderRadius: '4px',
+									}}
+								>
+									<div style={{ flex: 1, minWidth: 0 }}>
+										<TextControl
+											label={sprintf(__('Marker %d Label', 'newopm'), index + 1)}
+											value={marker.label || ''}
+											onChange={value => handleMarkerLabelChange(marker.id, value)}
+											__next40pxDefaultSize
+											__nextHasNoMarginBottom
+										/>
+										<p style={{ margin: '8px 0 0 0', fontSize: '11px', color: '#666' }}>
+											{`Lat: ${marker.lat.toFixed(5)}, Lon: ${marker.lon.toFixed(5)}`}
+										</p>
+										<ColorPalette
+											colors={MARKER_COLOR_OPTIONS}
+											value={MARKER_COLOR_PALETTE[marker.color] || MARKER_COLOR_PALETTE.blue}
+											onChange={colorValue => {
+												const match = MARKER_COLOR_OPTIONS.find(option => option.color === colorValue);
+												handleMarkerColorChange(marker.id, match ? match.name : 'blue');
+											}}
+											disableCustomColors
+											clearable={false}
+										/>
+									</div>
+									<div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+										<Button
+											variant='tertiary'
+											onClick={() => {
+												setOpenPopupMarkerId(marker.id);
+												setIsMarkerListOpen(false);
+											}}
+										>
+											{__('Locate', 'newopm')}
+										</Button>
+										<Button variant='secondary' isDestructive onClick={() => handleMarkerDelete(marker.id)}>
+											{__('Delete', 'newopm')}
+										</Button>
+									</div>
+								</div>
+							))}
+						</div>
+					)}
+				</Modal>
+			)}
 
 			<div {...blockProps}>
 				<Suspense
