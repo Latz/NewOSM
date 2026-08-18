@@ -65,6 +65,11 @@
 		color: #333;
 	}
 
+	/* Multimarker: hand cursor when hovering a marker (clickable to open its options popup) */
+	.newopm-multimarker-icon {
+		cursor: pointer;
+	}
+
 	.leaflet-control-fullscreen a {
 		background-color: white;
 		border: 2px solid rgba(0, 0, 0, 0.3);

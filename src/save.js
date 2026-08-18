@@ -2,7 +2,8 @@ import { useBlockProps } from '@wordpress/block-editor';
 import { __ } from '@wordpress/i18n';
 
 export default function save({ attributes }) {
-	const { latitude, longitude, zoom, markerLat, markerLon, markerLabel, height, width, mapId } = attributes;
+	const { latitude, longitude, zoom, markerLat, markerLon, markerLabel, multimarker, markers, height, width, mapId } =
+		attributes;
 	const blockProps = useBlockProps.save();
 
 	// Validate coordinates to prevent rendering invalid maps
@@ -30,6 +31,11 @@ export default function save({ attributes }) {
 	// For old blocks without mapId, use a deterministic default
 	const finalMapId = mapId || 'newopm-map-default';
 
+	const validMarkers =
+		multimarker && Array.isArray(markers)
+			? markers.filter(m => typeof m.lat === 'number' && typeof m.lon === 'number')
+			: [];
+
 	return (
 		<div {...blockProps}>
 			<div
@@ -41,6 +47,8 @@ export default function save({ attributes }) {
 				data-marker-lat={markerLat}
 				data-marker-lon={markerLon}
 				data-marker-label={markerLabel}
+				data-multimarker={multimarker ? 'true' : 'false'}
+				data-markers={multimarker ? JSON.stringify(validMarkers) : undefined}
 				data-height={height}
 				data-width={width}
 				style={{ height: height + 'px', width: width || '100%' }}

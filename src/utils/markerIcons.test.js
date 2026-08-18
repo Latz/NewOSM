@@ -3,7 +3,15 @@
  * See FUTURE_OPTIMIZATIONS.md #5
  */
 
-import { markerIconSVG, markerIconRetinaUrl, markerShadowUrl, markerIconConfig, applySVGMarkerIcons } from './markerIcons';
+import {
+	markerIconSVG,
+	markerIconRetinaUrl,
+	markerShadowUrl,
+	markerIconConfig,
+	applySVGMarkerIcons,
+	createMarkerIcon,
+	MARKER_COLOR_PALETTE,
+} from './markerIcons';
 
 describe('SVG Marker Icons', () => {
 	test('markerIconSVG should be a valid data URI', () => {
@@ -95,5 +103,61 @@ describe('SVG Marker Icons', () => {
 
 		expect(decodedMarker).toContain('viewBox="0 0 25 41"');
 		expect(decodedRetina).toContain('viewBox="0 0 25 41"');
+	});
+});
+
+describe('createMarkerIcon (multimarker per-marker icons)', () => {
+	test('returns a Leaflet divIcon with the expected size/anchor config', () => {
+		const icon = createMarkerIcon({ color: 'red', markerId: 'm-1' });
+
+		expect(icon.options.className).toBe('newopm-multimarker-icon');
+		expect(icon.options.iconSize).toEqual(markerIconConfig.iconSize);
+		expect(icon.options.iconAnchor).toEqual(markerIconConfig.iconAnchor);
+		expect(icon.options.popupAnchor).toEqual(markerIconConfig.popupAnchor);
+	});
+
+	test('uses the requested palette color in the embedded SVG', () => {
+		const icon = createMarkerIcon({ color: 'green', markerId: 'm-2' });
+		const svgMatch = icon.options.html.match(/src="([^"]+)"/);
+		const decodedSvg = atob(svgMatch[1].replace('data:image/svg+xml;base64,', ''));
+
+		expect(decodedSvg).toContain(MARKER_COLOR_PALETTE.green);
+	});
+
+	test('falls back to the blue palette color for an unknown/missing color', () => {
+		const iconUnknown = createMarkerIcon({ color: 'not-a-color', markerId: 'm-3' });
+		const iconMissing = createMarkerIcon({ markerId: 'm-4' });
+
+		[iconUnknown, iconMissing].forEach(icon => {
+			const svgMatch = icon.options.html.match(/src="([^"]+)"/);
+			const decodedSvg = atob(svgMatch[1].replace('data:image/svg+xml;base64,', ''));
+			expect(decodedSvg).toContain(MARKER_COLOR_PALETTE.blue);
+		});
+	});
+
+	test('stamps the marker id as a data-marker-id attribute', () => {
+		const icon = createMarkerIcon({ color: 'blue', markerId: 'm-42' });
+
+		expect(icon.options.html).toContain('data-marker-id="m-42"');
+	});
+
+	test('escapes special characters in the marker id to prevent attribute injection', () => {
+		const icon = createMarkerIcon({ color: 'blue', markerId: `"><img src=x onerror=alert(1)>` });
+
+		expect(icon.options.html).not.toContain('<img src=x onerror=alert(1)>');
+		expect(icon.options.html).toContain('&quot;&gt;&lt;img src=x onerror=alert(1)&gt;');
+	});
+
+	test('handles a missing markerId gracefully', () => {
+		const icon = createMarkerIcon({ color: 'orange' });
+
+		expect(icon.options.html).toContain('data-marker-id=""');
+	});
+
+	test('called with no arguments still returns a usable icon', () => {
+		const icon = createMarkerIcon();
+
+		expect(icon.options.className).toBe('newopm-multimarker-icon');
+		expect(icon.options.html).toContain('data-marker-id=""');
 	});
 });

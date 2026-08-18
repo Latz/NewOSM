@@ -11,6 +11,15 @@ module.exports = {
 	},
 	// Enable source maps in development for easier debugging
 	devtool: process.env.NODE_ENV === 'development' ? 'source-map' : false,
+	output: {
+		...defaultConfig.output,
+		// Lazy-loaded chunks (e.g. src/index.js's dynamic import() of
+		// MapEditor.js) otherwise get a static, unhashed filename that
+		// never changes between builds and has no WP-side cache-busting
+		// query string like the main entry bundles do — a browser that
+		// cached it once can keep serving a stale version indefinitely.
+		chunkFilename: '[name].[contenthash].js',
+	},
 	// Optimization configuration
 	optimization: {
 		...defaultConfig.optimization,
