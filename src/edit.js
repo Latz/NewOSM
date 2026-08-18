@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from '@wordpress/element';
-import { InspectorControls, useBlockProps } from '@wordpress/block-editor';
+import { InspectorControls, useBlockProps, MediaUpload, MediaUploadCheck, RichText } from '@wordpress/block-editor';
 import {
 	PanelBody,
 	TextControl,
@@ -506,7 +506,14 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 				try {
 					const data = await nominatimAPI.reverse(lat, lon, controller.signal);
 					if (data && data.display_name) {
-						updateMarkerFields(markerId, { lat, lon, label: data.display_name });
+						// label is rendered as RichText-authored HTML (see view.js), so a
+						// plain-text address from Nominatim must be entity-escaped before
+						// being stored, otherwise stray `&`/`<`/`>` would be mis-parsed as markup.
+						const escapedAddress = data.display_name
+							.replace(/&/g, '&amp;')
+							.replace(/</g, '&lt;')
+							.replace(/>/g, '&gt;');
+						updateMarkerFields(markerId, { lat, lon, label: escapedAddress });
 					}
 				} catch (error) {
 					if (error.name === 'AbortError') {
@@ -568,6 +575,20 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 	const handleMarkerColorChange = useCallback(
 		(markerId, color) => {
 			updateMarkerFields(markerId, { color });
+		},
+		[updateMarkerFields]
+	);
+
+	const handleMarkerImageChange = useCallback(
+		(markerId, media) => {
+			updateMarkerFields(markerId, { image: media?.url || '' });
+		},
+		[updateMarkerFields]
+	);
+
+	const handleMarkerImageRemove = useCallback(
+		markerId => {
+			updateMarkerFields(markerId, { image: '' });
 		},
 		[updateMarkerFields]
 	);
@@ -1010,12 +1031,16 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 									}}
 								>
 									<div style={{ flex: 1, minWidth: 0 }}>
-										<TextControl
-											label={sprintf(__('Marker %d Label', 'newopm'), index + 1)}
+										<p className='newopm-marker-popup-richtext-label'>
+											{sprintf(__('Marker %d Label', 'newopm'), index + 1)}
+										</p>
+										<RichText
+											tagName='p'
+											className='newopm-marker-popup-richtext'
 											value={marker.label || ''}
 											onChange={value => handleMarkerLabelChange(marker.id, value)}
-											__next40pxDefaultSize
-											__nextHasNoMarginBottom
+											placeholder={__('Customize marker text', 'newopm')}
+											allowedFormats={['core/bold', 'core/italic', 'core/link']}
 										/>
 										<p style={{ margin: '8px 0 0 0', fontSize: '11px', color: '#666' }}>
 											{`Lat: ${marker.lat.toFixed(5)}, Lon: ${marker.lon.toFixed(5)}`}
@@ -1030,6 +1055,33 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 											disableCustomColors
 											clearable={false}
 										/>
+										<div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+											{marker.image && (
+												<img
+													src={marker.image}
+													alt=''
+													style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }}
+												/>
+											)}
+											<MediaUploadCheck>
+												<MediaUpload
+													onSelect={media => handleMarkerImageChange(marker.id, media)}
+													allowedTypes={['image']}
+													multiple={false}
+													value={marker.image}
+													render={({ open }) => (
+														<Button variant='secondary' onClick={open}>
+															{marker.image ? __('Replace Image', 'newopm') : __('Add Image', 'newopm')}
+														</Button>
+													)}
+												/>
+											</MediaUploadCheck>
+											{marker.image && (
+												<Button variant='tertiary' isDestructive onClick={() => handleMarkerImageRemove(marker.id)}>
+													{__('Remove', 'newopm')}
+												</Button>
+											)}
+										</div>
 									</div>
 									<div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
 										<Button
@@ -1091,6 +1143,8 @@ export default function Edit({ attributes, setAttributes, isSelected }) {
 						onMarkerDragEnd={handleMarkerDragEndMulti}
 						onMarkerLabelChange={handleMarkerLabelChange}
 						onMarkerColorChange={handleMarkerColorChange}
+						onMarkerImageChange={handleMarkerImageChange}
+						onMarkerImageRemove={handleMarkerImageRemove}
 						onMarkerDelete={handleMarkerDelete}
 					/>
 				</Suspense>

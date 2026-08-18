@@ -8,7 +8,8 @@
 import { Component, useEffect, useRef, useState, useMemo, useCallback } from '@wordpress/element';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { __ } from '@wordpress/i18n';
-import { TextControl, Button, ColorPalette } from '@wordpress/components';
+import { Button, ColorPalette } from '@wordpress/components';
+import { MediaUpload, MediaUploadCheck, RichText } from '@wordpress/block-editor';
 import L from 'leaflet';
 import { FullScreen } from 'leaflet.fullscreen';
 import 'leaflet.fullscreen/dist/Control.FullScreen.css';
@@ -440,9 +441,11 @@ function DraggableMarker({ position, onDragEnd, label }) {
  * @param {Function} props.registerRef    - (markerId, leafletMarkerInstance|null) => void
  * @param {Function} props.onLabelChange  - (markerId, label) => void
  * @param {Function} props.onColorChange  - (markerId, color) => void
+ * @param {Function} props.onImageChange  - (markerId, media) => void
+ * @param {Function} props.onImageRemove  - (markerId) => void
  * @param {Function} props.onDelete       - (markerId) => void
  */
-function MultiMarker({ marker, isPopupOpen, registerRef, onLabelChange, onColorChange, onDelete }) {
+function MultiMarker({ marker, isPopupOpen, registerRef, onLabelChange, onColorChange, onImageChange, onImageRemove, onDelete }) {
 	const [markerRef, setMarkerRef] = useState(null);
 	const icon = useMemo(() => createMarkerIcon({ color: marker.color, markerId: marker.id }), [marker.color, marker.id]);
 
@@ -474,13 +477,14 @@ function MultiMarker({ marker, isPopupOpen, registerRef, onLabelChange, onColorC
 		<Marker position={[marker.lat, marker.lon]} icon={icon} ref={setMarkerRef}>
 			<Popup>
 				<div className='newopm-marker-popup'>
-					<TextControl
-						label={__('Marker Label', 'newopm')}
+					<p className='newopm-marker-popup-richtext-label'>{__('Marker Label', 'newopm')}</p>
+					<RichText
+						tagName='p'
+						className='newopm-marker-popup-richtext'
 						value={marker.label || ''}
 						onChange={value => onLabelChange(marker.id, value)}
 						placeholder={__('Customize marker text', 'newopm')}
-						__next40pxDefaultSize
-						__nextHasNoMarginBottom
+						allowedFormats={['core/bold', 'core/italic', 'core/link']}
 					/>
 					<ColorPalette
 						colors={MARKER_COLOR_OPTIONS}
@@ -492,6 +496,33 @@ function MultiMarker({ marker, isPopupOpen, registerRef, onLabelChange, onColorC
 						disableCustomColors
 						clearable={false}
 					/>
+					<div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+						{marker.image && (
+							<img
+								src={marker.image}
+								alt=''
+								style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }}
+							/>
+						)}
+						<MediaUploadCheck>
+							<MediaUpload
+								onSelect={media => onImageChange(marker.id, media)}
+								allowedTypes={['image']}
+								multiple={false}
+								value={marker.image}
+								render={({ open }) => (
+									<Button variant='secondary' onClick={open}>
+										{marker.image ? __('Replace Image', 'newopm') : __('Add Image', 'newopm')}
+									</Button>
+								)}
+							/>
+						</MediaUploadCheck>
+						{marker.image && (
+							<Button variant='tertiary' isDestructive onClick={() => onImageRemove(marker.id)}>
+								{__('Remove', 'newopm')}
+							</Button>
+						)}
+					</div>
 					<Button
 						isDestructive
 						variant='secondary'
@@ -626,6 +657,8 @@ export default function MapEditor({
 	onMarkerDragEnd,
 	onMarkerLabelChange,
 	onMarkerColorChange,
+	onMarkerImageChange,
+	onMarkerImageRemove,
 	onMarkerDelete,
 }) {
 	// Get optimal tile configuration based on device performance
@@ -696,6 +729,8 @@ export default function MapEditor({
 									registerRef={registerMarkerRef}
 									onLabelChange={onMarkerLabelChange}
 									onColorChange={onMarkerColorChange}
+									onImageChange={onMarkerImageChange}
+									onImageRemove={onMarkerImageRemove}
 									onDelete={onMarkerDelete}
 								/>
 							))

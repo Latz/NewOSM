@@ -65,6 +65,41 @@
 		font-size: 14px;
 	}
 
+	.newopm-marker-popup-image {
+		display: block;
+		max-width: 200px;
+		height: auto;
+		margin-top: 4px;
+		border-radius: 4px;
+	}
+
+	/* All multi-marker popups: fixed width, height follows content */
+	.newopm-marker-popup-frontend {
+		width: 300px;
+	}
+
+	/* Marker popups with an image: image flush across the top */
+	.newopm-marker-popup-frontend--with-image {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.newopm-marker-popup-frontend--with-image .newopm-marker-popup-image {
+		/* Bleed out of Leaflet's 12px .leaflet-popup-content margin so the image
+		   spans the full card width flush with the top/side edges. */
+		width: calc(100% + 24px);
+		max-width: none;
+		margin: -12px -12px 0;
+		height: 160px;
+		object-fit: cover;
+		border-radius: 0;
+		flex: 0 0 auto;
+	}
+
+	.newopm-marker-popup-frontend--with-image .newopm-marker-popup-text {
+		padding-top: 8px;
+	}
+
 	/* Responsive adjustments */
 	@media (max-width: 768px) {
 		:scope {
